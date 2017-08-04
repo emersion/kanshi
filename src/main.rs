@@ -35,6 +35,56 @@ struct ConnectedOutput {
 	edid: edid::EDID,
 }
 
+impl PartialEq<SavedOutput> for ConnectedOutput {
+	fn eq(&self, other: &SavedOutput) -> bool {
+		if self.name.replace("-", "") != other.name.replace("-", "") {
+			//return false;
+		}
+		if self.edid.header.vendor[..].iter().collect::<String>() != other.vendor {
+			return false;
+		}
+		if other.product.starts_with("0x") {
+			let other_product = u16::from_str_radix(other.product.trim_left_matches("0x"), 16).unwrap();
+			if other_product != self.edid.header.product {
+				return false;
+			}
+		} else {
+			let ok = self.edid.descriptors.iter()
+			.filter_map(|d| match d {
+				&edid::Descriptor::Name(ref s) => Some(s.as_ref()),
+				_ => None,
+			})
+			.nth(0)
+			.map(|product| product == other.product)
+			.unwrap_or(false);
+
+			if !ok {
+				return false;
+			}
+		}
+		if other.serial.starts_with("0x") {
+			let other_serial = u32::from_str_radix(other.serial.trim_left_matches("0x"), 16).unwrap();
+			if other_serial != self.edid.header.serial {
+				return false;
+			}
+		} else {
+			let ok = self.edid.descriptors.iter()
+			.filter_map(|d| match d {
+				&edid::Descriptor::SerialNumber(ref s) => Some(s.as_ref()),
+				_ => None,
+			})
+			.nth(0)
+			.map(|serial| serial == other.serial)
+			.unwrap_or(false);
+
+			if !ok {
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
 fn parse_bool(s: &str) -> bool {
 	s == "yes"
 }
@@ -42,7 +92,7 @@ fn parse_bool(s: &str) -> bool {
 fn main() {
 	let output_prefix = "card0-";
 
-	let outputs = fs::read_dir("/sys/class/drm").unwrap()
+	let connected_outputs = fs::read_dir("/sys/class/drm").unwrap()
 	.map(|r| r.unwrap())
 	.filter(|e| e.file_name().to_str().unwrap().starts_with(output_prefix))
 	.filter(|e| {
@@ -60,7 +110,7 @@ fn main() {
 		ConnectedOutput{name, edid}
 	})
 	.collect::<Vec<_>>();
-	println!("{:?}", outputs);
+	println!("{:?}", connected_outputs);
 
 	let user_config_path = env::var("XDG_CONFIG_HOME")
 	.map(PathBuf::from)
@@ -68,7 +118,7 @@ fn main() {
 	let monitors_path = user_config_path.join("monitors.xml");
 
 	let monitors = Element::parse(File::open(&monitors_path).unwrap()).unwrap();
-	let configurations = monitors.children.iter()
+	let configuration = monitors.children.iter()
 	.filter(|e| e.name == "configuration")
 	.map(|e| {
 		e.children.iter()
@@ -103,8 +153,16 @@ fn main() {
 
 			o
 		})
+		.collect::<Vec<_>>()
+	})
+	.find(|config| {
+		if config.len() != connected_outputs.len() {
+			return false;
+		}
+
+		config.iter().all(|saved| {
+			connected_outputs.iter().any(|connected| connected == saved)
+		})
 	});
-	for configuration in configurations {
-		println!("{:?}", configuration.collect::<Vec<_>>());
-	}
+	println!("{:?}", configuration);
 }
