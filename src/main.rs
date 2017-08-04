@@ -37,9 +37,10 @@ struct ConnectedOutput {
 
 impl PartialEq<SavedOutput> for ConnectedOutput {
 	fn eq(&self, other: &SavedOutput) -> bool {
-		if self.name.replace("-", "") != other.name.replace("-", "") {
-			//return false;
-		}
+		// TODO: more permissive comparison, try to extract type and number
+		//if self.name.replace("-", "") != other.name.replace("-", "") {
+		//	return false;
+		//}
 		if self.edid.header.vendor[..].iter().collect::<String>() != other.vendor {
 			return false;
 		}
@@ -155,14 +156,26 @@ fn main() {
 		})
 		.collect::<Vec<_>>()
 	})
-	.find(|config| {
-		if config.len() != connected_outputs.len() {
-			return false;
+	.filter_map(|config| {
+		let n_saved = config.len();
+		if n_saved != connected_outputs.len() {
+			return None;
 		}
 
-		config.iter().all(|saved| {
-			connected_outputs.iter().any(|connected| connected == saved)
+		let matched = config.into_iter()
+		.filter_map(|saved| {
+			connected_outputs.iter()
+			.find(|connected| **connected == saved)
+			.map(|connected| (connected.name.clone(), saved))
 		})
-	});
+		.collect::<Vec<_>>();
+
+		if n_saved != matched.len() {
+			return None;
+		}
+
+		Some(matched)
+	})
+	.nth(0);
 	println!("{:?}", configuration);
 }
