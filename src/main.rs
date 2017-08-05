@@ -1,37 +1,27 @@
 extern crate edid;
 extern crate getopts;
-extern crate xmltree;
 
 mod backend;
+mod store;
 
-use std::env;
-use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::env;
 
 use getopts::Options;
-use xmltree::Element;
 
 use backend::{ConnectedOutput, Backend, SysFsBackend};
+use store::{SavedOutput, Store, GnomeStore};
 
-#[derive(Debug, Default)]
-struct SavedOutput {
-	name: String,
-	vendor: String,
-	product: String,
-	serial: String,
+fn connector_type(name: &str) -> Option<String> {
+	let name = name.to_lowercase();
 
-	width: i32,
-	height: i32,
-	rate: f32,
-	x: i32,
-	y: i32,
-	//rotation: Rotation,
-	//reflect_x: bool,
-	//reflect_y: bool,
-	primary: bool,
-	//presentation: bool,
-	//underscanning: bool,
+	[
+		"VGA", "Unknown", "DVI", "Composite", "SVIDEO", "LVDS", "Component", "DIN", "DP", "HDMI",
+		"TV", "eDP", "Virtual", "DSI",
+	]
+	.iter()
+	.find(|t| name.starts_with(t.to_lowercase().as_str()))
+	.map(|s| s.to_string())
 }
 
 impl PartialEq<SavedOutput> for ConnectedOutput {
@@ -90,22 +80,6 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 	}
 }
 
-fn parse_bool(s: &str) -> bool {
-	s == "yes"
-}
-
-fn connector_type(name: &str) -> Option<String> {
-	let name = name.to_lowercase();
-
-	[
-		"VGA", "Unknown", "DVI", "Composite", "SVIDEO", "LVDS", "Component", "DIN", "DP", "HDMI",
-		"TV", "eDP", "Virtual", "DSI",
-	]
-	.iter()
-	.find(|t| name.starts_with(t.to_lowercase().as_str()))
-	.map(|s| s.to_string())
-}
-
 fn print_usage(program: &str, opts: Options) {
 	let brief = format!("Usage: {} [options]", program);
 	print!("{}", opts.usage(&brief));
@@ -130,62 +104,27 @@ fn main() {
 
 	let mut stderr = std::io::stdout();
 
-	let be = SysFsBackend{};
-	let connected_outputs = be.list_outputs().unwrap();
+	let backend = SysFsBackend{};
+	let connected_outputs = match backend.list_outputs() {
+		Ok(c) => c,
+		Err(err) => {
+			writeln!(&mut stderr, "Error: cannot list connected monitors: {}", err).unwrap();
+			std::process::exit(1);
+		},
+	};
 
 	writeln!(&mut stderr, "Connected outputs: {:?}", connected_outputs).unwrap();
 
-	let user_config_path = env::var("XDG_CONFIG_HOME")
-	.map(PathBuf::from)
-	.unwrap_or(env::home_dir().unwrap().join(".config"));
-	let monitors_path = user_config_path.join("monitors.xml");
-
-	let f = match File::open(&monitors_path) {
-		Ok(f) => f,
+	let store = GnomeStore{};
+	let configurations = match store.list_configurations() {
+		Ok(c) => c,
 		Err(err) => {
-			writeln!(&mut stderr, "Error: cannot open config file {:?}: {}", &monitors_path, err).unwrap();
+			writeln!(&mut stderr, "Error: cannot list saved monitor configurations: {}", err).unwrap();
 			std::process::exit(1);
-		}
+		},
 	};
 
-	let monitors = Element::parse(f).unwrap();
-	let configuration = monitors.children.iter()
-	.filter(|e| e.name == "configuration")
-	.map(|e| {
-		e.children.iter()
-		.filter(|e| e.name == "output")
-		.map(|e| {
-			let mut o = SavedOutput{
-				name: e.attributes.get("name").unwrap().to_owned(),
-				vendor: e.get_child("vendor").unwrap().text.as_ref().unwrap().to_owned(),
-				product: e.get_child("product").unwrap().text.as_ref().unwrap().to_owned(),
-				serial: e.get_child("serial").unwrap().text.as_ref().unwrap().to_owned(),
-				..SavedOutput::default()
-			};
-
-			if let Some(c) = e.get_child("width") {
-				o.width = c.text.as_ref().unwrap().parse::<i32>().unwrap()
-			}
-			if let Some(c) = e.get_child("height") {
-				o.height = c.text.as_ref().unwrap().parse::<i32>().unwrap()
-			}
-			if let Some(c) = e.get_child("rate") {
-				o.rate = c.text.as_ref().unwrap().parse::<f32>().unwrap()
-			}
-			if let Some(c) = e.get_child("x") {
-				o.x = c.text.as_ref().unwrap().parse::<i32>().unwrap()
-			}
-			if let Some(c) = e.get_child("y") {
-				o.y = c.text.as_ref().unwrap().parse::<i32>().unwrap()
-			}
-			if let Some(c) = e.get_child("primary") {
-				o.primary = parse_bool(c.text.as_ref().unwrap())
-			}
-
-			o
-		})
-		.collect::<Vec<_>>()
-	})
+	let configuration = configurations.iter()
 	.filter_map(|config| {
 		let n_saved = config.len();
 		if n_saved != connected_outputs.len() {
@@ -195,7 +134,7 @@ fn main() {
 		let matched = config.into_iter()
 		.filter_map(|saved| {
 			connected_outputs.iter()
-			.find(|connected| **connected == saved)
+			.find(|connected| **connected == *saved)
 			.map(|connected| (connected.name.clone(), saved))
 		})
 		.collect::<Vec<_>>();
