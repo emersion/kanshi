@@ -102,7 +102,7 @@ fn connector_type(name: &str) -> Option<String> {
 	let name = name.to_lowercase();
 
 	[
-		"VGA", "Unknown", "VDI", "Composite", "SVIDEO", "LVDS", "Component", "DIN", "DP", "HDMI",
+		"VGA", "Unknown", "DVI", "Composite", "SVIDEO", "LVDS", "Component", "DIN", "DP", "HDMI",
 		"TV", "eDP", "Virtual", "DSI",
 	]
 	.iter()
