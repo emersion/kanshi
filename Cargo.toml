@@ -1,6 +1,11 @@
 [package]
 name = "kanshi"
 version = "0.1.0"
+description = "Dynamic display configuration"
+homepage = "https://github.com/emersion/kanshi"
+repository = "https://github.com/emersion/kanshi"
+readme = "README.md"
+license = "MIT"
 authors = ["emersion"]
 
 [dependencies]

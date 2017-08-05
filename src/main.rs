@@ -40,10 +40,6 @@ struct ConnectedOutput {
 
 impl PartialEq<SavedOutput> for ConnectedOutput {
 	fn eq(&self, other: &SavedOutput) -> bool {
-		// TODO: more permissive comparison, try to extract type and number
-		//if self.name.replace("-", "") != other.name.replace("-", "") {
-		//	return false;
-		//}
 		if let Some(t) = connector_type(&self.name) {
 			if let Some(other_t) = connector_type(&other.name) {
 				if t != other_t {
