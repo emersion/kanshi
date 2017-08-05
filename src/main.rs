@@ -9,6 +9,7 @@ use std::io::prelude::*;
 use std::io::Write;
 use std::path::PathBuf;
 
+use getopts::Options;
 use xmltree::Element;
 
 #[derive(Debug, Default)]
@@ -113,19 +114,40 @@ fn connector_type(name: &str) -> Option<String> {
 	.map(|s| s.to_string())
 }
 
+fn print_usage(program: &str, opts: Options) {
+	let brief = format!("Usage: {} [options]", program);
+	print!("{}", opts.usage(&brief));
+}
+
+const OUTPUT_PREFIX: &str = "card0-";
+
 fn main() {
-	let output_prefix = "card0-";
+	let args: Vec<String> = env::args().collect();
+	let program = args[0].clone();
+
+	let mut opts = Options::new();
+
+	opts
+	.optopt("", "primary-workspace", "set the primary workspace name", "<workspace>")
+	.optflag("h", "help", "print this help menu");
+
+	let opts_matches = opts.parse(&args[1..]).unwrap();
+
+	if opts_matches.opt_present("h") {
+		print_usage(&program, opts);
+		return;
+	}
 
 	let connected_outputs = fs::read_dir("/sys/class/drm").unwrap()
 	.map(|r| r.unwrap())
-	.filter(|e| e.file_name().to_str().unwrap().starts_with(output_prefix))
+	.filter(|e| e.file_name().to_str().unwrap().starts_with(OUTPUT_PREFIX))
 	.filter(|e| {
 		let mut status = String::new();
 		File::open(e.path().join("status")).unwrap().read_to_string(&mut status).unwrap();
 		status.trim() == "connected"
 	})
 	.map(|e| {
-		let name = e.file_name().to_str().unwrap().trim_left_matches(output_prefix).to_string();
+		let name = e.file_name().to_str().unwrap().trim_left_matches(OUTPUT_PREFIX).to_string();
 
 		let mut buf = Vec::new();
 		File::open(e.path().join("edid")).unwrap().read_to_end(&mut buf).unwrap();
@@ -134,7 +156,8 @@ fn main() {
 		ConnectedOutput{name, edid}
 	})
 	.collect::<Vec<_>>();
-	println!("{:?}", connected_outputs);
+
+	eprintln!("Connected outputs: {:?}", connected_outputs);
 
 	let user_config_path = env::var("XDG_CONFIG_HOME")
 	.map(PathBuf::from)
@@ -201,7 +224,7 @@ fn main() {
 	})
 	.nth(0);
 
-	println!("{:?}", &configuration);
+	eprintln!("Matching configuration: {:?}", &configuration);
 
 	if let Some(config) = configuration {
 		let mut w = std::io::stdout();
@@ -210,6 +233,12 @@ fn main() {
 				continue;
 			}
 			writeln!(&mut w, "output {} pos {},{} res {}x{}", name, output.x, output.y, output.width, output.height).unwrap();
+
+			if output.primary {
+				if let Some(workspace) = opts_matches.opt_str("primary-workspace") {
+					writeln!(&mut w, "workspace {} output {}", workspace, name).unwrap();
+				}
+			}
 		}
 	}
 }
