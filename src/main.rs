@@ -162,7 +162,15 @@ fn main() {
 	.unwrap_or(env::home_dir().unwrap().join(".config"));
 	let monitors_path = user_config_path.join("monitors.xml");
 
-	let monitors = Element::parse(File::open(&monitors_path).unwrap()).unwrap();
+	let f = match File::open(&monitors_path) {
+		Ok(f) => f,
+		Err(err) => {
+			writeln!(&mut stderr, "Error: cannot open config file {:?}: {}", &monitors_path, err).unwrap();
+			std::process::exit(1);
+		}
+	};
+
+	let monitors = Element::parse(f).unwrap();
 	let configuration = monitors.children.iter()
 	.filter(|e| e.name == "configuration")
 	.map(|e| {
