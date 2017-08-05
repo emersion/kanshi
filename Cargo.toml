@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["emersion"]
 
 [dependencies]
-xmltree = "0.4.0"
 edid = "0.1.1"
+getopts = "0.2.14"
+xmltree = "0.4.0"

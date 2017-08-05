@@ -1,10 +1,12 @@
-extern crate xmltree;
 extern crate edid;
+extern crate getopts;
+extern crate xmltree;
 
 use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::Write;
 use std::path::PathBuf;
 
 use xmltree::Element;
@@ -41,6 +43,15 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 		//if self.name.replace("-", "") != other.name.replace("-", "") {
 		//	return false;
 		//}
+		if let Some(t) = connector_type(&self.name) {
+			if let Some(other_t) = connector_type(&other.name) {
+				if t != other_t {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		}
 		if self.edid.header.vendor[..].iter().collect::<String>() != other.vendor {
 			return false;
 		}
@@ -88,6 +99,18 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 
 fn parse_bool(s: &str) -> bool {
 	s == "yes"
+}
+
+fn connector_type(name: &str) -> Option<String> {
+	let name = name.to_lowercase();
+
+	[
+		"VGA", "Unknown", "VDI", "Composite", "SVIDEO", "LVDS", "Component", "DIN", "DP", "HDMI",
+		"TV", "eDP", "Virtual", "DSI",
+	]
+	.iter()
+	.find(|t| name.starts_with(t.to_lowercase().as_str()))
+	.map(|s| s.to_string())
 }
 
 fn main() {
@@ -177,5 +200,16 @@ fn main() {
 		Some(matched)
 	})
 	.nth(0);
-	println!("{:?}", configuration);
+
+	println!("{:?}", &configuration);
+
+	if let Some(config) = configuration {
+		let mut w = std::io::stdout();
+		for (name, output) in config {
+			if output.width == 0 || output.height == 0 {
+				continue;
+			}
+			writeln!(&mut w, "output {} pos {},{} res {}x{}", name, output.x, output.y, output.width, output.height).unwrap();
+		}
+	}
 }
