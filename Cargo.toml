@@ -9,6 +9,6 @@ license = "MIT"
 authors = ["emersion"]
 
 [dependencies]
-edid = "0.1.1"
+edid = "0.2.0"
 getopts = "0.2.14"
 xmltree = "0.4.0"

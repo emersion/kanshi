@@ -60,7 +60,7 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 		} else {
 			let ok = self.edid.descriptors.iter()
 			.filter_map(|d| match d {
-				&edid::Descriptor::Name(ref s) => Some(s.as_ref()),
+				&edid::Descriptor::ProductName(ref s) => Some(s.as_ref()),
 				_ => None,
 			})
 			.nth(0)
