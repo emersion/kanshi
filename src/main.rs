@@ -2,15 +2,17 @@ extern crate edid;
 extern crate getopts;
 extern crate xmltree;
 
+mod backend;
+
 use std::env;
-use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::Write;
 use std::path::PathBuf;
 
 use getopts::Options;
 use xmltree::Element;
+
+use backend::{ConnectedOutput, Backend, SysFsBackend};
 
 #[derive(Debug, Default)]
 struct SavedOutput {
@@ -30,12 +32,6 @@ struct SavedOutput {
 	primary: bool,
 	//presentation: bool,
 	//underscanning: bool,
-}
-
-#[derive(Debug)]
-struct ConnectedOutput {
-	name: String,
-	edid: edid::EDID,
 }
 
 impl PartialEq<SavedOutput> for ConnectedOutput {
@@ -115,8 +111,6 @@ fn print_usage(program: &str, opts: Options) {
 	print!("{}", opts.usage(&brief));
 }
 
-const OUTPUT_PREFIX: &str = "card0-";
-
 fn main() {
 	let args: Vec<String> = env::args().collect();
 	let program = args[0].clone();
@@ -136,24 +130,8 @@ fn main() {
 
 	let mut stderr = std::io::stdout();
 
-	let connected_outputs = fs::read_dir("/sys/class/drm").unwrap()
-	.map(|r| r.unwrap())
-	.filter(|e| e.file_name().to_str().unwrap().starts_with(OUTPUT_PREFIX))
-	.filter(|e| {
-		let mut status = String::new();
-		File::open(e.path().join("status")).unwrap().read_to_string(&mut status).unwrap();
-		status.trim() == "connected"
-	})
-	.map(|e| {
-		let name = e.file_name().to_str().unwrap().trim_left_matches(OUTPUT_PREFIX).to_string();
-
-		let mut buf = Vec::new();
-		File::open(e.path().join("edid")).unwrap().read_to_end(&mut buf).unwrap();
-		let (_, edid) = edid::parse(&buf).unwrap();
-
-		ConnectedOutput{name, edid}
-	})
-	.collect::<Vec<_>>();
+	let be = SysFsBackend{};
+	let connected_outputs = be.list_outputs().unwrap();
 
 	writeln!(&mut stderr, "Connected outputs: {:?}", connected_outputs).unwrap();
 
