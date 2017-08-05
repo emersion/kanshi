@@ -134,6 +134,8 @@ fn main() {
 		return;
 	}
 
+	let mut stderr = std::io::stdout();
+
 	let connected_outputs = fs::read_dir("/sys/class/drm").unwrap()
 	.map(|r| r.unwrap())
 	.filter(|e| e.file_name().to_str().unwrap().starts_with(OUTPUT_PREFIX))
@@ -153,7 +155,7 @@ fn main() {
 	})
 	.collect::<Vec<_>>();
 
-	eprintln!("Connected outputs: {:?}", connected_outputs);
+	writeln!(&mut stderr, "Connected outputs: {:?}", connected_outputs).unwrap();
 
 	let user_config_path = env::var("XDG_CONFIG_HOME")
 	.map(PathBuf::from)
@@ -220,7 +222,7 @@ fn main() {
 	})
 	.nth(0);
 
-	eprintln!("Matching configuration: {:?}", &configuration);
+	writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
 
 	if let Some(config) = configuration {
 		let mut w = std::io::stdout();
