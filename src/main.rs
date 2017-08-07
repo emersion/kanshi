@@ -3,6 +3,7 @@ extern crate getopts;
 
 mod backend;
 mod store;
+mod frontend;
 
 use std::io::Write;
 use std::env;
@@ -11,6 +12,7 @@ use getopts::Options;
 
 use backend::{ConnectedOutput, Backend, SysFsBackend};
 use store::{SavedOutput, Store, GnomeStore};
+use frontend::{MatchedOutput, Frontend, SwayFrontend};
 
 fn connector_type(name: &str) -> Option<String> {
 	let name = name.to_lowercase();
@@ -124,6 +126,7 @@ fn main() {
 		},
 	};
 
+	let connected_outputs = &connected_outputs;
 	let configuration = configurations.iter()
 	.filter_map(|config| {
 		let n_saved = config.len();
@@ -135,7 +138,7 @@ fn main() {
 		.filter_map(|saved| {
 			connected_outputs.iter()
 			.find(|connected| **connected == *saved)
-			.map(|connected| (connected.name.clone(), saved))
+			.map(|connected| MatchedOutput{connected, saved})
 		})
 		.collect::<Vec<_>>();
 
@@ -149,19 +152,12 @@ fn main() {
 
 	writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
 
-	if let Some(config) = configuration {
-		let mut w = std::io::stdout();
-		for (name, output) in config {
-			if output.width == 0 || output.height == 0 {
-				continue;
-			}
-			writeln!(&mut w, "output {} pos {},{} res {}x{}", name, output.x, output.y, output.width, output.height).unwrap();
-
-			if output.primary {
-				if let Some(workspace) = opts_matches.opt_str("primary-workspace") {
-					writeln!(&mut w, "workspace {} output {}", workspace, name).unwrap();
-				}
-			}
-		}
-	}
+	let frontend = SwayFrontend::new(opts_matches);
+	match frontend.apply_configuration(configuration) {
+		Ok(()) => (),
+		Err(err) => {
+			writeln!(&mut stderr, "Error: cannot apply configuration: {}", err).unwrap();
+			std::process::exit(1);
+		},
+	};
 }

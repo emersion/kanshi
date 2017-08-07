@@ -12,6 +12,7 @@ pub struct SavedOutput {
 	pub product: String,
 	pub serial: String,
 
+	pub enabled: bool,
 	pub width: i32,
 	pub height: i32,
 	pub rate: f32,
@@ -75,6 +76,8 @@ impl Store for GnomeStore {
 				if let Some(c) = e.get_child("primary") {
 					o.primary = parse_bool(c.text.as_ref().unwrap())
 				}
+
+				o.enabled = o.width != 0 && o.height != 0;
 
 				o
 			})
