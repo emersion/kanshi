@@ -34,15 +34,16 @@ impl Frontend for SwayFrontend {
 		if let Some(config) = config {
 			let mut w = io::stdout();
 			for MatchedOutput{connected, saved} in config {
-				if !saved.enabled {
-					continue;
-				}
-				writeln!(&mut w, "output {} pos {},{} res {}x{}", connected.name, saved.x, saved.y, saved.width, saved.height).unwrap();
+				if saved.enabled {
+					writeln!(&mut w, "output {} pos {},{} res {}x{}", connected.name, saved.x, saved.y, saved.width, saved.height).unwrap();
 
-				if saved.primary {
-					if let Some(ref workspace) = self.primary_workspace {
-						writeln!(&mut w, "workspace {} output {}", workspace, connected.name).unwrap();
+					if saved.primary {
+						if let Some(ref workspace) = self.primary_workspace {
+							writeln!(&mut w, "workspace {} output {}", workspace, connected.name).unwrap();
+						}
 					}
+				} else {
+					writeln!(&mut w, "output {} disable", connected.name).unwrap();
 				}
 			}
 		}
