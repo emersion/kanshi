@@ -4,6 +4,7 @@ version = "0.1.1"
 dependencies = [
  "edid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmltree 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

@@ -35,7 +35,7 @@ impl Frontend for SwayFrontend {
 			let mut w = io::stdout();
 			for MatchedOutput{connected, saved} in config {
 				if saved.enabled {
-					writeln!(&mut w, "output {} pos {},{} res {}x{}", connected.name, saved.x, saved.y, saved.width, saved.height).unwrap();
+					writeln!(&mut w, "output {} position {},{} resolution {}x{}", connected.name, saved.x, saved.y, saved.width, saved.height).unwrap();
 
 					if saved.primary {
 						if let Some(ref workspace) = self.primary_workspace {

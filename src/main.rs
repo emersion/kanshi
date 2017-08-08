@@ -1,5 +1,7 @@
 extern crate edid;
 extern crate getopts;
+#[macro_use]
+extern crate nom;
 
 mod backend;
 mod store;
@@ -117,7 +119,8 @@ fn main() {
 
 	writeln!(&mut stderr, "Connected outputs: {:?}", connected_outputs).unwrap();
 
-	let store = GnomeStore{};
+	//let store = GnomeStore{};
+	let store = store::KanshiStore{};
 	let configurations = match store.list_configurations() {
 		Ok(c) => c,
 		Err(err) => {

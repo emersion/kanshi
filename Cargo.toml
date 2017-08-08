@@ -12,3 +12,7 @@ authors = ["emersion"]
 edid = "0.2.0"
 getopts = "0.2.14"
 xmltree = "0.4.0"
+
+[dependencies.nom]
+version = "3.2.0"
+features = ["verbose-errors"]
