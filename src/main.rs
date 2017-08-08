@@ -30,24 +30,29 @@ fn connector_type(name: &str) -> Option<String> {
 
 impl PartialEq<SavedOutput> for ConnectedOutput {
 	fn eq(&self, other: &SavedOutput) -> bool {
-		if let Some(t) = connector_type(&self.name) {
-			if let Some(other_t) = connector_type(&other.name) {
-				if t != other_t {
+		if other.name != "" {
+			if let Some(t) = connector_type(&self.name) {
+				if let Some(other_t) = connector_type(&other.name) {
+					if t != other_t {
+						return false;
+					}
+				} else {
 					return false;
 				}
-			} else {
-				return false;
 			}
 		}
-		if self.edid.header.vendor[..].iter().collect::<String>() != other.vendor {
-			return false;
+		if other.vendor != "" {
+			let vendor = self.edid.header.vendor[..].iter().collect::<String>();
+			if vendor != other.vendor {
+				return false;
+			}
 		}
 		if other.product.starts_with("0x") {
 			let other_product = u16::from_str_radix(other.product.trim_left_matches("0x"), 16).unwrap();
 			if other_product != self.edid.header.product {
 				return false;
 			}
-		} else {
+		} else if other.product != "" {
 			let ok = self.edid.descriptors.iter()
 			.filter_map(|d| match d {
 				&edid::Descriptor::ProductName(ref s) => Some(s.as_ref()),
@@ -66,7 +71,7 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 			if other_serial != self.edid.header.serial {
 				return false;
 			}
-		} else {
+		} else if other.serial != "" {
 			let ok = self.edid.descriptors.iter()
 			.filter_map(|d| match d {
 				&edid::Descriptor::SerialNumber(ref s) => Some(s.as_ref()),
@@ -128,6 +133,8 @@ fn main() {
 			std::process::exit(1);
 		},
 	};
+
+	//writeln!(&mut stderr, "Saved configurations: {:?}", configurations).unwrap();
 
 	let connected_outputs = &connected_outputs;
 	let configuration = configurations.iter()
