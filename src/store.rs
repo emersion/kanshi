@@ -145,6 +145,27 @@ fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
 	o
 }
 
+named!(parse_vendor<&[u8], OutputArg>, do_parse!(
+	tag!("vendor")
+	>> parse_space
+	>> v: parse_string
+	>> (OutputArg::Vendor(v))
+));
+
+named!(parse_product<&[u8], OutputArg>, do_parse!(
+	tag!("product")
+	>> parse_space
+	>> p: parse_string
+	>> (OutputArg::Product(p))
+));
+
+named!(parse_serial<&[u8], OutputArg>, do_parse!(
+	tag!("serial")
+	>> parse_space
+	>> s: parse_string
+	>> (OutputArg::Serial(s))
+));
+
 named!(parse_disable<&[u8], OutputArg>, do_parse!(tag!("disable") >> (OutputArg::Disable)));
 
 named!(parse_i32<&[u8], i32>, map_res!(
@@ -180,7 +201,10 @@ named!(parse_scale<&[u8], OutputArg>, do_parse!(
 	>> (OutputArg::Scale(f))
 ));
 
-named!(parse_argument<&[u8], OutputArg>, alt!(parse_disable | parse_resolution | parse_position | parse_scale));
+named!(parse_argument<&[u8], OutputArg>, alt!(
+	parse_vendor | parse_product | parse_serial |
+	parse_disable | parse_resolution | parse_position | parse_scale
+));
 
 named!(parse_output<&[u8], SavedOutput>, do_parse!(
 	tag!("output")
