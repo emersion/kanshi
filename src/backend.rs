@@ -1,6 +1,7 @@
 extern crate edid;
 
 use std::error::Error;
+use std::fmt;
 use std::fs::{File, read_dir};
 use std::io::prelude::*;
 
@@ -8,6 +9,38 @@ use std::io::prelude::*;
 pub struct ConnectedOutput {
 	pub name: String,
 	pub edid: edid::EDID,
+}
+
+impl ConnectedOutput {
+	pub fn vendor(&self) -> String {
+		self.edid.header.vendor[..].iter().collect::<String>()
+	}
+
+	pub fn product(&self) -> String {
+		self.edid.descriptors.iter()
+		.filter_map(|d| match d {
+			&edid::Descriptor::ProductName(ref s) => Some(s.to_string()),
+			_ => None,
+		})
+		.nth(0)
+		.unwrap_or(format!("0x{:X}", self.edid.header.product))
+	}
+
+	pub fn serial(&self) -> String {
+		self.edid.descriptors.iter()
+		.filter_map(|d| match d {
+			&edid::Descriptor::SerialNumber(ref s) => Some(s.to_string()),
+			_ => None,
+		})
+		.nth(0)
+		.unwrap_or(format!("0x{:X}", self.edid.header.serial))
+	}
+}
+
+impl fmt::Display for ConnectedOutput {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "output {} vendor {} product {} serial {}", self.name, self.vendor(), self.product(), self.serial())
+	}
 }
 
 pub trait Backend {

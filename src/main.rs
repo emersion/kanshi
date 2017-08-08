@@ -42,8 +42,7 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 			}
 		}
 		if other.vendor != "" {
-			let vendor = self.edid.header.vendor[..].iter().collect::<String>();
-			if vendor != other.vendor {
+			if self.vendor() != other.vendor {
 				return false;
 			}
 		}
@@ -53,16 +52,7 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 				return false;
 			}
 		} else if other.product != "" {
-			let ok = self.edid.descriptors.iter()
-			.filter_map(|d| match d {
-				&edid::Descriptor::ProductName(ref s) => Some(s.as_ref()),
-				_ => None,
-			})
-			.nth(0)
-			.map(|product| product == other.product)
-			.unwrap_or(false);
-
-			if !ok {
+			if self.product() != other.product {
 				return false;
 			}
 		}
@@ -72,16 +62,7 @@ impl PartialEq<SavedOutput> for ConnectedOutput {
 				return false;
 			}
 		} else if other.serial != "" {
-			let ok = self.edid.descriptors.iter()
-			.filter_map(|d| match d {
-				&edid::Descriptor::SerialNumber(ref s) => Some(s.as_ref()),
-				_ => None,
-			})
-			.nth(0)
-			.map(|serial| serial == other.serial)
-			.unwrap_or(false);
-
-			if !ok {
+			if self.serial() != other.serial {
 				return false;
 			}
 		}
@@ -122,7 +103,10 @@ fn main() {
 		},
 	};
 
-	writeln!(&mut stderr, "Connected outputs: {:?}", connected_outputs).unwrap();
+	writeln!(&mut stderr, "Connected outputs:").unwrap();
+	for o in &connected_outputs {
+		writeln!(&mut stderr, "{}", o).unwrap();
+	}
 
 	//let store = GnomeStore{};
 	let store = store::KanshiStore{};
