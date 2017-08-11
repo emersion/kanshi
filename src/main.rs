@@ -2,10 +2,12 @@ extern crate edid;
 extern crate getopts;
 #[macro_use]
 extern crate nom;
+extern crate notify;
 
 mod backend;
 mod store;
 mod frontend;
+mod notifier;
 
 use std::io::Write;
 use std::env;

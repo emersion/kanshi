@@ -1,9 +1,16 @@
 extern crate edid;
+extern crate notify;
 
 use std::error::Error;
 use std::fmt;
 use std::fs::{File, read_dir};
 use std::io::prelude::*;
+use std::sync::mpsc::{Sender, channel};
+use std::thread;
+
+use notify::{Watcher, RecursiveMode, RawEvent, raw_watcher};
+
+use notifier::Notifier;
 
 #[derive(Debug)]
 pub struct ConnectedOutput {
@@ -73,5 +80,28 @@ impl Backend for SysFsBackend {
 		.collect::<Vec<_>>();
 
 		Ok(outputs)
+	}
+}
+
+impl Notifier for SysFsBackend {
+	fn notify(&self, tx: Sender<()>) -> Result<(), Box<Error>> {
+		let (subtx, subrx) = channel();
+		let mut watcher = raw_watcher(subtx).unwrap();
+		watcher.watch("/sys/class/drm/TODO", RecursiveMode::NonRecursive).unwrap();
+
+		thread::spawn(move || {
+			loop {
+				match subrx.recv() {
+					Ok(RawEvent{path: Some(path), op: Ok(op), cookie}) => {
+						println!("{:?} {:?} ({:?})", op, path, cookie);
+						tx.send(());
+					},
+					Ok(event) => println!("broken event: {:?}", event),
+					Err(err) => println!("watch error: {:?}", err),
+				}
+			}
+		});
+
+		Ok(())
 	}
 }
