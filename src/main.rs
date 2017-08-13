@@ -13,7 +13,7 @@ use std::env;
 use getopts::Options;
 
 use backend::{ConnectedOutput, Backend, SysFsBackend};
-use store::{SavedOutput, Store, GnomeStore};
+use store::{SavedOutput, Store, GnomeStore, KanshiStore};
 use frontend::{MatchedOutput, Frontend, SwayFrontend};
 
 fn connector_type(name: &str) -> Option<String> {
@@ -82,7 +82,10 @@ fn main() {
 	let mut opts = Options::new();
 
 	opts
-	.optopt("", "primary-workspace", "set the primary workspace name", "<workspace>")
+	.optopt("b", "backend", "set the backend (sysfs)", "<backend>")
+	.optopt("s", "store", "set the store (gnome, kanshi)", "<store>")
+	.optopt("f", "frontend", "set the frontend (sway)", "<frontend>")
+	.optopt("", "primary-workspace", "set the primary workspace name (sway)", "<workspace>")
 	.optflag("h", "help", "print this help menu");
 
 	let opts_matches = opts.parse(&args[1..]).unwrap();
@@ -94,7 +97,22 @@ fn main() {
 
 	let mut stderr = std::io::stdout();
 
-	let backend = SysFsBackend{};
+	let backend: Box<Backend> = match opts_matches.opt_str("backend").as_ref().map(String::as_ref) {
+		None | Some("sysfs") => Box::new(SysFsBackend{}),
+		_ => panic!("Unknown backend"),
+	};
+
+	let store: Box<Store> = match opts_matches.opt_str("store").as_ref().map(String::as_ref) {
+		Some("gnome") => Box::new(GnomeStore{}),
+		None | Some("kanshi") => Box::new(KanshiStore{}),
+		_ => panic!("Unknown store"),
+	};
+
+	let frontend: Box<Frontend> = match opts_matches.opt_str("frontend").as_ref().map(String::as_ref) {
+		None | Some("sway") => Box::new(SwayFrontend::new(opts_matches)),
+		_ => panic!("Unknown frontend"),
+	};
+
 	let connected_outputs = match backend.list_outputs() {
 		Ok(c) => c,
 		Err(err) => {
@@ -108,8 +126,6 @@ fn main() {
 		writeln!(&mut stderr, "{}", o).unwrap();
 	}
 
-	//let store = GnomeStore{};
-	let store = store::KanshiStore{};
 	let configurations = match store.list_configurations() {
 		Ok(c) => c,
 		Err(err) => {
@@ -146,7 +162,6 @@ fn main() {
 
 	writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
 
-	let frontend = SwayFrontend::new(opts_matches);
 	match frontend.apply_configuration(configuration) {
 		Ok(()) => (),
 		Err(err) => {
