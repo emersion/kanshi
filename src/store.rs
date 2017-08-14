@@ -30,6 +30,7 @@ pub struct SavedOutput {
 	pub primary: bool,
 	//pub presentation: bool,
 	//pub underscanning: bool,
+	pub scale: i32,
 }
 
 pub trait Store {
@@ -138,7 +139,7 @@ fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
 				o.x = x;
 				o.y = y;
 			},
-			OutputArg::Scale(_) => (), // TODO
+			OutputArg::Scale(i) => o.scale = i,
 		}
 	}
 

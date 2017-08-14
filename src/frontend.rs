@@ -35,15 +35,24 @@ impl Frontend for SwayFrontend {
 			let mut w = io::stdout();
 			for MatchedOutput{connected, saved} in config {
 				if saved.enabled {
-					writeln!(&mut w, "output {} position {},{} resolution {}x{}", connected.name, saved.x, saved.y, saved.width, saved.height).unwrap();
+					let mut l = format!("output {}", &connected.name);
+					l += &format!(" position {},{}", saved.x, saved.y);
+					if saved.width > 0 && saved.height > 0 {
+						l += &format!(" resolution {}x{}", saved.width, saved.height);
+					}
+					if saved.scale > 0 {
+						l += &format!(" scale {}", saved.scale);
+					}
+					l += "\n";
+					w.write(l.as_bytes()).unwrap();
 
 					if saved.primary {
 						if let Some(ref workspace) = self.primary_workspace {
-							writeln!(&mut w, "workspace {} output {}", workspace, connected.name).unwrap();
+							writeln!(&mut w, "workspace {} output {}", workspace, &connected.name).unwrap();
 						}
 					}
 				} else {
-					writeln!(&mut w, "output {} disable", connected.name).unwrap();
+					writeln!(&mut w, "output {} disable", &connected.name).unwrap();
 				}
 			}
 		}
