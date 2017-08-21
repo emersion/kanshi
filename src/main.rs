@@ -95,7 +95,7 @@ fn main() {
 		return;
 	}
 
-	let mut stderr = std::io::stdout();
+	let mut stderr = std::io::stderr();
 
 	let backend: Box<Backend> = match opts_matches.opt_str("backend").as_ref().map(String::as_ref) {
 		None | Some("sysfs") => Box::new(SysFsBackend{}),
