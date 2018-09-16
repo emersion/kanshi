@@ -7,6 +7,7 @@ support multiple display configurations (e.g. i3/Sway).
 For now, it only supports:
 
 * `sysfs` as backend
+* `udev` as notifier
 * Configuration file
 	* GNOME (`~/.config/monitors.xml`)
 	* Kanshi (see below)
@@ -17,7 +18,7 @@ For now, it only supports:
 ```sh
 cargo install kanshi
 touch ~/.config/kanshi/config
-kanshi > ~/.config/sway/outputs
+kanshi
 ```
 
 ### Configuration file
