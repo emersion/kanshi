@@ -112,8 +112,9 @@ fn main() {
 		_ => panic!("Unknown store"),
 	};
 
-	let notifier: Box<Notifier> = match opts_matches.opt_str("notifier").as_ref().map(String::as_ref) {
-		None | Some("udev") => Box::new(UdevNotifier{}),
+	let notifier: Option<Box<Notifier>> = match opts_matches.opt_str("notifier").as_ref().map(String::as_ref) {
+		None | Some("udev") => Some(Box::new(UdevNotifier{})),
+		Some("none") => None,
 		_ => panic!("Unknown notifier"),
 	};
 
@@ -122,8 +123,11 @@ fn main() {
 		_ => panic!("Unknown frontend"),
 	};
 
-	let (tx, rx) = channel();
-	notifier.notify(tx).unwrap();
+	let rx = notifier.map(|notifier| {
+		let (tx, rx) = channel();
+		notifier.notify(tx).unwrap();
+		rx
+	});
 
 	loop {
 		let connected_outputs = match backend.list_outputs() {
@@ -183,7 +187,12 @@ fn main() {
 			},
 		};
 
-		writeln!(&mut stderr, "Waiting for output changes...").unwrap();
-		rx.recv().unwrap();
+		match rx {
+			Some(ref rx) => {
+				writeln!(&mut stderr, "Waiting for output changes...").unwrap();
+				rx.recv().unwrap();
+			}
+			None => break
+		}
 	}
 }
