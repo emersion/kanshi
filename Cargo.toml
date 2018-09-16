@@ -11,8 +11,9 @@ authors = ["emersion"]
 [dependencies]
 edid = "0.2.0"
 getopts = "0.2.14"
+i3ipc = { git = "https://github.com/emersion/i3ipc-rs", branch = "sway" }
+libudev = "0.2"
 xmltree = "0.4.0"
-notify = "4.0.1"
 
 [dependencies.nom]
 version = "3.2.0"

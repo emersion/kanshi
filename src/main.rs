@@ -2,7 +2,6 @@ extern crate edid;
 extern crate getopts;
 #[macro_use]
 extern crate nom;
-extern crate notify;
 
 mod backend;
 mod store;
@@ -17,6 +16,8 @@ use getopts::Options;
 use backend::{ConnectedOutput, Backend, SysFsBackend};
 use store::{SavedOutput, Store, GnomeStore, KanshiStore};
 use frontend::{MatchedOutput, Frontend, SwayFrontend};
+use notifier::{Notifier, UdevNotifier};
+use std::sync::mpsc::channel;
 
 fn connector_type(name: &str) -> Option<String> {
 	let name = name.to_lowercase();
@@ -87,6 +88,7 @@ fn main() {
 	.optopt("b", "backend", "set the backend (sysfs)", "<backend>")
 	.optopt("s", "store", "set the store (gnome, kanshi)", "<store>")
 	.optopt("f", "frontend", "set the frontend (sway)", "<frontend>")
+	.optopt("n", "notifier", "set the notifier (udev)", "<notifier>")
 	.optopt("", "primary-workspace", "set the primary workspace name (sway)", "<workspace>")
 	.optflag("h", "help", "print this help menu");
 
@@ -110,65 +112,78 @@ fn main() {
 		_ => panic!("Unknown store"),
 	};
 
+	let notifier: Box<Notifier> = match opts_matches.opt_str("notifier").as_ref().map(String::as_ref) {
+		None | Some("udev") => Box::new(UdevNotifier{}),
+		_ => panic!("Unknown notifier"),
+	};
+
 	let frontend: Box<Frontend> = match opts_matches.opt_str("frontend").as_ref().map(String::as_ref) {
 		None | Some("sway") => Box::new(SwayFrontend::new(opts_matches)),
 		_ => panic!("Unknown frontend"),
 	};
 
-	let connected_outputs = match backend.list_outputs() {
-		Ok(c) => c,
-		Err(err) => {
-			writeln!(&mut stderr, "Error: cannot list connected monitors: {}", err).unwrap();
-			std::process::exit(1);
-		},
-	};
+	let (tx, rx) = channel();
+	notifier.notify(tx).unwrap();
 
-	writeln!(&mut stderr, "Connected outputs:").unwrap();
-	for o in &connected_outputs {
-		writeln!(&mut stderr, "{}", o).unwrap();
-	}
+	loop {
+		let connected_outputs = match backend.list_outputs() {
+			Ok(c) => c,
+			Err(err) => {
+				writeln!(&mut stderr, "Error: cannot list connected monitors: {}", err).unwrap();
+				std::process::exit(1);
+			},
+		};
 
-	let configurations = match store.list_configurations() {
-		Ok(c) => c,
-		Err(err) => {
-			writeln!(&mut stderr, "Error: cannot list saved monitor configurations: {}", err).unwrap();
-			std::process::exit(1);
-		},
-	};
-
-	//writeln!(&mut stderr, "Saved configurations: {:?}", configurations).unwrap();
-
-	let connected_outputs = &connected_outputs;
-	let configuration = configurations.iter()
-	.filter_map(|config| {
-		let n_saved = config.len();
-		if n_saved != connected_outputs.len() {
-			return None;
+		writeln!(&mut stderr, "Connected outputs:").unwrap();
+		for o in &connected_outputs {
+			writeln!(&mut stderr, "{}", o).unwrap();
 		}
 
-		let matched = config.into_iter()
-		.filter_map(|saved| {
-			connected_outputs.iter()
-			.find(|connected| **connected == *saved)
-			.map(|connected| MatchedOutput{connected, saved})
+		let configurations = match store.list_configurations() {
+			Ok(c) => c,
+			Err(err) => {
+				writeln!(&mut stderr, "Error: cannot list saved monitor configurations: {}", err).unwrap();
+				std::process::exit(1);
+			},
+		};
+
+		//writeln!(&mut stderr, "Saved configurations: {:?}", configurations).unwrap();
+
+		let connected_outputs = &connected_outputs;
+		let configuration = configurations.iter()
+		.filter_map(|config| {
+			let n_saved = config.len();
+			if n_saved != connected_outputs.len() {
+				return None;
+			}
+
+			let matched = config.into_iter()
+			.filter_map(|saved| {
+				connected_outputs.iter()
+				.find(|connected| **connected == *saved)
+				.map(|connected| MatchedOutput{connected, saved})
+			})
+			.collect::<Vec<_>>();
+
+			if n_saved != matched.len() {
+				return None;
+			}
+
+			Some(matched)
 		})
-		.collect::<Vec<_>>();
+		.nth(0);
 
-		if n_saved != matched.len() {
-			return None;
-		}
+		writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
 
-		Some(matched)
-	})
-	.nth(0);
+		match frontend.apply_configuration(configuration) {
+			Ok(()) => (),
+			Err(err) => {
+				writeln!(&mut stderr, "Error: cannot apply configuration: {}", err).unwrap();
+				std::process::exit(1);
+			},
+		};
 
-	writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
-
-	match frontend.apply_configuration(configuration) {
-		Ok(()) => (),
-		Err(err) => {
-			writeln!(&mut stderr, "Error: cannot apply configuration: {}", err).unwrap();
-			std::process::exit(1);
-		},
-	};
+		writeln!(&mut stderr, "Waiting for output changes...").unwrap();
+		rx.recv().unwrap();
+	}
 }
