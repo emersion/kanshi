@@ -7,7 +7,7 @@ support multiple display configurations (e.g. i3/Sway).
 For now, it only supports:
 
 * `sysfs` as backend
-* `udev` as notifier
+* `udev` as notifier (optional)
 * Configuration file
 	* GNOME (`~/.config/monitors.xml`)
 	* Kanshi (see below)
@@ -35,6 +35,14 @@ syntax as `sway(5)`.
 {
 	output LVDS-1 vendor CMN product 0x1484 serial 0x0 resolution 1600x900 scale 2
 }
+```
+
+### Running as a udev rule
+
+Edit `/etc/udev/rules.d/95-monitor-hotplug.rules`:
+
+```
+KERNEL=="card0", SUBSYSTEM=="drm", ENV{WAYLAND_DISPLAY}="wayland-0", RUN+="/usr/bin/kanshi -n none"
 ```
 
 ## License
