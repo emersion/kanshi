@@ -14,10 +14,17 @@ use std::env;
 use getopts::Options;
 
 use backend::{ConnectedOutput, Backend, SysFsBackend};
-use store::{SavedOutput, Store, GnomeStore, KanshiStore};
+use store::{SavedOutput, SavedConfiguration, Store, GnomeStore, KanshiStore};
 use frontend::{MatchedOutput, Frontend, SwayFrontend};
 use notifier::{Notifier, UdevNotifier};
 use std::sync::mpsc::channel;
+use std::process::Command;
+
+#[derive(Debug)]
+pub struct MatchedConfiguration<'a> {
+	pub outputs: Vec<MatchedOutput<'a>>,
+	pub saved: &'a SavedConfiguration,
+}
 
 fn connector_type(name: &str) -> Option<String> {
 	let name = name.to_lowercase();
@@ -156,12 +163,12 @@ fn main() {
 		let connected_outputs = &connected_outputs;
 		let configuration = configurations.iter()
 		.filter_map(|config| {
-			let n_saved = config.len();
+			let n_saved = config.outputs.len();
 			if n_saved != connected_outputs.len() {
 				return None;
 			}
 
-			let matched = config.into_iter()
+			let matched = config.outputs.iter()
 			.filter_map(|saved| {
 				connected_outputs.iter()
 				.find(|connected| **connected == *saved)
@@ -173,19 +180,34 @@ fn main() {
 				return None;
 			}
 
-			Some(matched)
+			Some(MatchedConfiguration{outputs: matched, saved: config})
 		})
 		.nth(0);
 
 		writeln!(&mut stderr, "Matching configuration: {:?}", &configuration).unwrap();
 
-		match frontend.apply_configuration(configuration) {
-			Ok(()) => (),
-			Err(err) => {
-				writeln!(&mut stderr, "Error: cannot apply configuration: {}", err).unwrap();
-				std::process::exit(1);
+		{
+			let outputs = configuration.as_ref().map(|config| config.outputs.as_ref());
+			match frontend.apply_configuration(outputs) {
+				Ok(()) => (),
+				Err(err) => {
+					writeln!(&mut stderr, "Error: cannot apply configuration: {}", err).unwrap();
+					std::process::exit(1);
+				},
+			};
+		}
+
+		match configuration.map(|config| &config.saved.exec) {
+			Some(exec) => {
+				for e in exec {
+					let cmd = e.get(0).unwrap();
+					let args = e.get(1..).unwrap();
+					writeln!(&mut stderr, "Executing command: {:?}", &cmd).unwrap();
+					Command::new(cmd).args(args).spawn().unwrap();
+				}
 			},
-		};
+			None => (),
+		}
 
 		match rx {
 			Some(ref rx) => {

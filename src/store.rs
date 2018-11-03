@@ -33,8 +33,14 @@ pub struct SavedOutput {
 	pub scale: i32,
 }
 
+#[derive(Debug, Default)]
+pub struct SavedConfiguration {
+	pub outputs: Vec<SavedOutput>,
+	pub exec: Vec<Vec<String>>,
+}
+
 pub trait Store {
-	fn list_configurations(&self) -> Result<Vec<Vec<SavedOutput>>, Box<Error>>;
+	fn list_configurations(&self) -> Result<Vec<SavedConfiguration>, Box<Error>>;
 }
 
 fn xdg_config_home() -> PathBuf {
@@ -50,7 +56,7 @@ fn parse_bool(s: &str) -> bool {
 pub struct GnomeStore;
 
 impl Store for GnomeStore {
-	fn list_configurations(&self) -> Result<Vec<Vec<SavedOutput>>, Box<Error>> {
+	fn list_configurations(&self) -> Result<Vec<SavedConfiguration>, Box<Error>> {
 		let monitors_path = xdg_config_home().join("monitors.xml");
 
 		let monitors = xmltree::Element::parse(File::open(&monitors_path)?).unwrap();
@@ -59,7 +65,7 @@ impl Store for GnomeStore {
 		.map(|e| {
 			// TODO: <clone> support
 
-			e.children.iter()
+			let outputs = e.children.iter()
 			.filter(|e| e.name == "output")
 			.map(|e| {
 				let mut o = SavedOutput{
@@ -93,7 +99,9 @@ impl Store for GnomeStore {
 
 				o
 			})
-			.collect::<Vec<_>>()
+			.collect::<Vec<_>>();
+
+			SavedConfiguration{outputs, exec: Vec::new()}
 		})
 		.collect::<Vec<_>>();
 
@@ -202,27 +210,61 @@ named!(parse_scale<&[u8], OutputArg>, do_parse!(
 	>> (OutputArg::Scale(f))
 ));
 
-named!(parse_argument<&[u8], OutputArg>, alt!(
+named!(parse_output_arg<&[u8], OutputArg>, alt!(
 	parse_vendor | parse_product | parse_serial |
 	parse_disable | parse_resolution | parse_position | parse_scale
 ));
 
-named!(parse_output<&[u8], SavedOutput>, do_parse!(
+enum ConfigurationArg {
+	Output(SavedOutput),
+	Exec(Vec<String>),
+}
+
+fn parse_configuration_with_args(args: Vec<ConfigurationArg>) -> SavedConfiguration {
+	let mut c = SavedConfiguration::default();
+
+	for arg in args {
+		match arg {
+			ConfigurationArg::Output(o) => c.outputs.push(o),
+			ConfigurationArg::Exec(e) => c.exec.push(e),
+		}
+	}
+
+	c
+}
+
+named!(parse_output<&[u8], ConfigurationArg>, do_parse!(
 	tag!("output")
 	>> parse_space
 	>> name: parse_string
-	>> args: many0!(preceded!(parse_space, parse_argument))
-	>> (parse_output_with_args(name, args))
+	>> args: many0!(preceded!(parse_space, parse_output_arg))
+	>> (ConfigurationArg::Output(parse_output_with_args(name, args)))
 ));
 
-named!(parse_configuration<&[u8], Vec<SavedOutput>>, delimited!(tag!("{"), many0!(ws!(parse_output)), tag!("}")));
+named!(parse_exec<&[u8], ConfigurationArg>, do_parse!(
+	tag!("exec")
+	>> cmd: many1!(preceded!(parse_space, parse_string))
+	>> (ConfigurationArg::Exec(cmd))
+));
 
-named!(parse_configuration_list<&[u8], Vec<Vec<SavedOutput>>>, many0!(ws!(parse_configuration)));
+named!(parse_configuration_arg<&[u8], ConfigurationArg>, alt!(parse_output | parse_exec));
+
+named!(parse_configuration_args<&[u8], Vec<ConfigurationArg>>, delimited!(
+	tag!("{"),
+	many0!(ws!(parse_configuration_arg)),
+	tag!("}")
+));
+
+named!(parse_configuration<&[u8], SavedConfiguration>, map!(
+	parse_configuration_args, parse_configuration_with_args
+));
+
+named!(parse_configuration_list<&[u8], Vec<SavedConfiguration>>, many0!(ws!(parse_configuration)));
 
 pub struct KanshiStore;
 
 impl Store for KanshiStore {
-	fn list_configurations(&self) -> Result<Vec<Vec<SavedOutput>>, Box<Error>> {
+	fn list_configurations(&self) -> Result<Vec<SavedConfiguration>, Box<Error>> {
 		let config_path = xdg_config_home().join("kanshi").join("config");
 
 		let mut buf = Vec::new();

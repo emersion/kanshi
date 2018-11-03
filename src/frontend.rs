@@ -17,7 +17,7 @@ pub struct MatchedOutput<'a> {
 }
 
 pub trait Frontend {
-	fn apply_configuration(&self, Option<Vec<MatchedOutput>>) -> Result<(), Box<Error>>;
+	fn apply_configuration<'a>(&self, Option<&'a [MatchedOutput<'a>]>) -> Result<(), Box<Error>>;
 }
 
 pub struct SwayFrontend {
@@ -31,7 +31,7 @@ impl SwayFrontend {
 		}
 	}
 
-	fn get_commands(&self, config: Option<Vec<MatchedOutput>>) -> Vec<String> {
+	fn get_commands<'a>(&self, config: Option<&'a [MatchedOutput<'a>]>) -> Vec<String> {
 		if let Some(config) = config {
 			let mut cmds = Vec::with_capacity(config.len());
 			for MatchedOutput{connected, saved} in config {
@@ -61,7 +61,7 @@ impl SwayFrontend {
 		}
 	}
 
-	fn print_configuration(&self, config: Option<Vec<MatchedOutput>>) -> Result<(), Box<Error>> {
+	fn print_configuration<'a>(&self, config: Option<&'a [MatchedOutput<'a>]>) -> Result<(), Box<Error>> {
 		let cmds = self.get_commands(config);
 		let mut w = io::stdout();
 		for cmd in cmds {
@@ -73,7 +73,7 @@ impl SwayFrontend {
 }
 
 impl Frontend for SwayFrontend {
-	fn apply_configuration(&self, config: Option<Vec<MatchedOutput>>) -> Result<(), Box<Error>> {
+	fn apply_configuration<'a>(&self, config: Option<&'a [MatchedOutput<'a>]>) -> Result<(), Box<Error>> {
 		let cmds = self.get_commands(config);
 		let mut conn = I3Connection::connect()?;
 		for cmd in cmds {
