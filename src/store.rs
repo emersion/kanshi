@@ -233,10 +233,21 @@ fn parse_configuration_with_args(args: Vec<ConfigurationArg>) -> SavedConfigurat
 	c
 }
 
+named!(parse_output_name<&[u8], String>, map!(
+	parse_string,
+	|s| {
+		if s == "*" {
+			String::from("")
+		} else {
+			s
+		}
+	}
+));
+
 named!(parse_output<&[u8], ConfigurationArg>, do_parse!(
 	tag!("output")
 	>> parse_space
-	>> name: parse_string
+	>> name: parse_output_name
 	>> args: many0!(preceded!(parse_space, parse_output_arg))
 	>> (ConfigurationArg::Output(parse_output_with_args(name, args)))
 ));
