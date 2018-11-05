@@ -10,11 +10,11 @@ authors = ["emersion"]
 
 [dependencies]
 edid = "0.2.0"
-getopts = "0.2.14"
-i3ipc = { git = "https://github.com/emersion/i3ipc-rs", branch = "sway" }
+getopts = "0.2.18"
+i3ipc = "0.8.4"
 libudev = "0.2"
-xmltree = "0.4.0"
+xmltree = "0.8.0"
 
 [dependencies.nom]
-version = "3.2.0"
+version = "4.1.1"
 features = ["verbose-errors"]
