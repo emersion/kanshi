@@ -9,8 +9,6 @@ use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
 
-use nom::digit;
-
 #[derive(Debug, Default)]
 pub struct SavedOutput {
 	pub name: String,
@@ -30,7 +28,7 @@ pub struct SavedOutput {
 	pub primary: bool,
 	//pub presentation: bool,
 	//pub underscanning: bool,
-	pub scale: i32,
+	pub scale: f32,
 }
 
 #[derive(Debug, Default)]
@@ -127,7 +125,7 @@ enum OutputArg {
 	Disable,
 	Resolution(i32, i32),
 	Position(i32, i32),
-	Scale(i32),
+	Scale(f32),
 }
 
 fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
@@ -147,7 +145,7 @@ fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
 				o.x = x;
 				o.y = y;
 			},
-			OutputArg::Scale(i) => o.scale = i,
+			OutputArg::Scale(f) => o.scale = f,
 		}
 	}
 
@@ -179,7 +177,7 @@ named!(parse_disable<&[u8], OutputArg>, do_parse!(tag!("disable") >> (OutputArg:
 
 named!(parse_i32<&[u8], i32>, map_res!(
 	map_res!(
-		digit,
+		nom::digit,
 		str::from_utf8
 	),
 	i32::from_str
@@ -203,10 +201,12 @@ named!(parse_position<&[u8], OutputArg>, do_parse!(
 	>> (OutputArg::Position(x, y))
 ));
 
+named!(parse_f32<&[u8], f32>, ws!(nom::float));
+
 named!(parse_scale<&[u8], OutputArg>, do_parse!(
 	tag!("scale")
 	>> parse_space
-	>> f: parse_i32
+	>> f: parse_f32
 	>> (OutputArg::Scale(f))
 ));
 
