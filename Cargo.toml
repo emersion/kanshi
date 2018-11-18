@@ -16,5 +16,5 @@ libudev = "0.2"
 xmltree = "0.8.0"
 
 [dependencies.nom]
-version = "4.1.1"
+version = "3.2.1"
 features = ["verbose-errors"]

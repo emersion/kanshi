@@ -53,7 +53,7 @@ dependencies = [
  "getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "i3ipc 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom 4.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmltree 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -105,29 +105,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "memchr"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
- "version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "nom"
 version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "memchr 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "nom"
-version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "memchr 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -161,11 +143,6 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "version_check"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "xml-rs"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -195,14 +172,11 @@ dependencies = [
 "checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
 "checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
 "checksum memchr 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a"
-"checksum memchr 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0a3eb002f0535929f1199681417029ebea04aadc0c7a4224b46be99c7f5d6a16"
 "checksum nom 3.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
-"checksum nom 4.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9c349f68f25f596b9f44cf0e7c69752a5c633b0550c3ff849518bfba0233774a"
 "checksum pkg-config 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "676e8eb2b1b4c9043511a9b7bea0915320d7e502b0a079fb03f9635a5252b18c"
 "checksum ryu 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "eb9e9b8cde282a9fe6a42dd4681319bfb63f121b8a8ee9439c6f4107e58a46f7"
 "checksum serde 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)" = "15c141fc7027dd265a47c090bf864cf62b42c4d228bbcf4e51a0c9e2b0d3f7ef"
 "checksum serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)" = "c37ccd6be3ed1fdf419ee848f7c758eb31b054d7cd3ae3600e3bae0adf569811"
 "checksum unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
-"checksum version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 "checksum xml-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c1cb601d29fe2c2ac60a2b2e5e293994d87a1f6fa9687a31a15270f909be9c2"
 "checksum xmltree 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff8eaee9d17062850f1e6163b509947969242990ee59a35801af437abe041e70"
