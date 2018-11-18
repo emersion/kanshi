@@ -37,7 +37,7 @@ impl SwayFrontend {
 			for MatchedOutput{connected, saved} in config {
 				if saved.enabled {
 					let mut l = format!("output {} enable", &connected.name);
-					l += &format!(" position {},{}", saved.x, saved.y);
+					l += &format!(" position {} {}", saved.x, saved.y);
 					if saved.width > 0 && saved.height > 0 {
 						l += &format!(" resolution {}x{}", saved.width, saved.height);
 					}
