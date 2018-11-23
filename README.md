@@ -37,14 +37,6 @@ syntax as `sway(5)`.
 }
 ```
 
-### Running as a udev rule
-
-Edit `/etc/udev/rules.d/95-monitor-hotplug.rules`:
-
-```
-KERNEL=="card0", SUBSYSTEM=="drm", ENV{WAYLAND_DISPLAY}="wayland-0", RUN+="/usr/bin/kanshi -n none"
-```
-
 ## License
 
 MIT
