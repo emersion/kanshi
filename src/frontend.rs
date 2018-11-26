@@ -41,6 +41,11 @@ impl SwayFrontend {
 					if saved.width > 0 && saved.height > 0 {
 						l += &format!(" resolution {}x{}", saved.width, saved.height);
 					}
+					if saved.rotation > 0 {
+						l += &format!(" transform {}", saved.rotation);
+					} else {
+						l += &format!(" transform normal");
+					}
 					if saved.scale > 0. {
 						l += &format!(" scale {}", saved.scale);
 					}
