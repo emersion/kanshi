@@ -41,14 +41,15 @@ impl SwayFrontend {
 					if saved.width > 0 && saved.height > 0 {
 						l += &format!(" resolution {}x{}", saved.width, saved.height);
 					}
-					if saved.rotation > 0 {
-						l += &format!(" transform {}", saved.rotation);
+					let mut v = ["90".to_string(),"180".into(),"270".into(),"flipped".into(),"flipped-90".into(),"flipped-180".into(),"flipped-270".into()];
+					if v.contains(&saved.transform) {
+						l += &format!(" transform {}", saved.transform.trim());
 					} else {
 						l += &format!(" transform normal");
 					}
 					if saved.scale > 0. {
 						l += &format!(" scale {}", saved.scale);
-					}
+					}					
 					cmds.push(l);
 
 					if saved.primary {

@@ -22,7 +22,7 @@ pub struct SavedOutput {
 	pub rate: f32,
 	pub x: i32,
 	pub y: i32,
-	pub rotation: i32,
+	pub transform: String,
 	//pub reflect_x: bool,
 	//pub reflect_y: bool,
 	pub primary: bool,
@@ -91,10 +91,10 @@ impl Store for GnomeStore {
 				}
 				if let Some(c) = e.get_child("rotation") {
 					match c.text.as_ref().unwrap().trim() {
-						"right" => o.rotation = 90,
-						"inverted" => o.rotation = 180,
-						"left" => o.rotation = 270,
-						_ => o.rotation = 0,
+						"right" => o.transform = "90".to_string(),
+						"inverted" => o.transform = "180".to_string(),
+						"left" => o.transform = "270".to_string(),
+						_ => o.transform = "normal".to_string(),
 					};
 				}
 				if let Some(c) = e.get_child("primary") {
@@ -133,7 +133,7 @@ enum OutputArg {
 	Disable,
 	Resolution(i32, i32),
 	Position(i32, i32),
-	Rotation(i32),
+	Transform(String),
 	Scale(f32),
 }
 
@@ -154,7 +154,7 @@ fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
 				o.x = x;
 				o.y = y;
 			},
-			OutputArg::Rotation(r) => o.rotation = r,
+			OutputArg::Transform(t) => o.transform = t,
 			OutputArg::Scale(f) => o.scale = f,
 		}
 	}
@@ -211,11 +211,11 @@ named!(parse_position<&[u8], OutputArg>, do_parse!(
 	>> (OutputArg::Position(x, y))
 ));
 
-named!(parse_rotation<&[u8], OutputArg>, do_parse!(
-	tag!("rotation")
+named!(parse_transform<&[u8], OutputArg>, do_parse!(
+	tag!("transform")
 	>> parse_space
-	>> r: parse_i32
-	>> (OutputArg::Rotation(r))
+	>> t: parse_string
+	>> (OutputArg::Transform(t))
 ));
 
 named!(parse_f32<&[u8], f32>, ws!(nom::float));
@@ -229,7 +229,7 @@ named!(parse_scale<&[u8], OutputArg>, do_parse!(
 
 named!(parse_output_arg<&[u8], OutputArg>, alt!(
 	parse_vendor | parse_product | parse_serial |
-	parse_disable | parse_resolution | parse_position | parse_rotation | parse_scale
+	parse_disable | parse_resolution | parse_position | parse_transform | parse_scale
 ));
 
 enum ConfigurationArg {
