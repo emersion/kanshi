@@ -9,6 +9,31 @@ use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
 
+#[derive(Debug)]
+pub enum Transform {
+	Rotation(i32),
+	FlippedRotation(i32)
+}
+impl Default for Transform {
+	fn default() -> Transform {
+		Transform::Rotation(0)
+	}
+}
+impl Transform {
+	fn from_str(s: &str) -> Transform {
+		match s {
+			"90" => Transform::Rotation(90),
+			"180" => Transform::Rotation(180),
+			"270" => Transform::Rotation(270),
+			"flipped" => Transform::FlippedRotation(0),
+			"flipped-90" => Transform::FlippedRotation(90),
+			"flipped-180" => Transform::FlippedRotation(180),
+			"flipped-270" => Transform::FlippedRotation(270),
+			_ => Transform::Rotation(0)
+		}
+	}
+}
+
 #[derive(Debug, Default)]
 pub struct SavedOutput {
 	pub name: String,
@@ -22,7 +47,7 @@ pub struct SavedOutput {
 	pub rate: f32,
 	pub x: i32,
 	pub y: i32,
-	pub transform: String,
+	pub transform: Transform,
 	//pub reflect_x: bool,
 	//pub reflect_y: bool,
 	pub primary: bool,
@@ -91,10 +116,10 @@ impl Store for GnomeStore {
 				}
 				if let Some(c) = e.get_child("rotation") {
 					match c.text.as_ref().unwrap().trim() {
-						"right" => o.transform = "90".to_string(),
-						"inverted" => o.transform = "180".to_string(),
-						"left" => o.transform = "270".to_string(),
-						_ => o.transform = "normal".to_string(),
+						"right" => o.transform = Transform::Rotation(90),
+						"inverted" => o.transform = Transform::Rotation(180),
+						"left" => o.transform = Transform::Rotation(270),
+						_ => o.transform = Transform::Rotation(0),
 					};
 				}
 				if let Some(c) = e.get_child("primary") {
@@ -133,7 +158,7 @@ enum OutputArg {
 	Disable,
 	Resolution(i32, i32),
 	Position(i32, i32),
-	Transform(String),
+	Transform(Transform),
 	Scale(f32),
 }
 
@@ -215,7 +240,7 @@ named!(parse_transform<&[u8], OutputArg>, do_parse!(
 	tag!("transform")
 	>> parse_space
 	>> t: parse_string
-	>> (OutputArg::Transform(t))
+	>> (OutputArg::Transform(Transform::from_str(&t)))
 ));
 
 named!(parse_f32<&[u8], f32>, ws!(nom::float));
