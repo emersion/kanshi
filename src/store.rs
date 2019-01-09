@@ -9,6 +9,31 @@ use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
 
+#[derive(Debug)]
+pub enum Transform {
+	Rotation(i32),
+	FlippedRotation(i32)
+}
+impl Default for Transform {
+	fn default() -> Transform {
+		Transform::Rotation(0)
+	}
+}
+impl Transform {
+	fn from_str(s: &str) -> Transform {
+		match s {
+			"90" => Transform::Rotation(90),
+			"180" => Transform::Rotation(180),
+			"270" => Transform::Rotation(270),
+			"flipped" => Transform::FlippedRotation(0),
+			"flipped-90" => Transform::FlippedRotation(90),
+			"flipped-180" => Transform::FlippedRotation(180),
+			"flipped-270" => Transform::FlippedRotation(270),
+			_ => Transform::Rotation(0)
+		}
+	}
+}
+
 #[derive(Debug, Default)]
 pub struct SavedOutput {
 	pub name: String,
@@ -22,7 +47,7 @@ pub struct SavedOutput {
 	pub rate: f32,
 	pub x: i32,
 	pub y: i32,
-	//pub rotation: Rotation,
+	pub transform: Transform,
 	//pub reflect_x: bool,
 	//pub reflect_y: bool,
 	pub primary: bool,
@@ -89,6 +114,14 @@ impl Store for GnomeStore {
 				if let Some(c) = e.get_child("y") {
 					o.y = c.text.as_ref().unwrap().parse::<i32>().unwrap()
 				}
+				if let Some(c) = e.get_child("rotation") {
+					match c.text.as_ref().unwrap().trim() {
+						"right" => o.transform = Transform::Rotation(90),
+						"inverted" => o.transform = Transform::Rotation(180),
+						"left" => o.transform = Transform::Rotation(270),
+						_ => o.transform = Transform::Rotation(0),
+					};
+				}
 				if let Some(c) = e.get_child("primary") {
 					o.primary = parse_bool(c.text.as_ref().unwrap())
 				}
@@ -125,6 +158,7 @@ enum OutputArg {
 	Disable,
 	Resolution(i32, i32),
 	Position(i32, i32),
+	Transform(Transform),
 	Scale(f32),
 }
 
@@ -145,6 +179,7 @@ fn parse_output_with_args(name: String, args: Vec<OutputArg>) -> SavedOutput {
 				o.x = x;
 				o.y = y;
 			},
+			OutputArg::Transform(t) => o.transform = t,
 			OutputArg::Scale(f) => o.scale = f,
 		}
 	}
@@ -201,6 +236,13 @@ named!(parse_position<&[u8], OutputArg>, do_parse!(
 	>> (OutputArg::Position(x, y))
 ));
 
+named!(parse_transform<&[u8], OutputArg>, do_parse!(
+	tag!("transform")
+	>> parse_space
+	>> t: parse_string
+	>> (OutputArg::Transform(Transform::from_str(&t)))
+));
+
 named!(parse_f32<&[u8], f32>, ws!(nom::float));
 
 named!(parse_scale<&[u8], OutputArg>, do_parse!(
@@ -212,7 +254,7 @@ named!(parse_scale<&[u8], OutputArg>, do_parse!(
 
 named!(parse_output_arg<&[u8], OutputArg>, alt!(
 	parse_vendor | parse_product | parse_serial |
-	parse_disable | parse_resolution | parse_position | parse_scale
+	parse_disable | parse_resolution | parse_position | parse_transform | parse_scale
 ));
 
 enum ConfigurationArg {
