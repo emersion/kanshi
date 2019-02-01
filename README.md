@@ -17,7 +17,7 @@ For now, it only supports:
 
 ```sh
 cargo install kanshi
-touch ~/.config/kanshi/config
+mkdir -p ~/.config/kanshi && touch ~/.config/kanshi/config
 kanshi
 ```
 
