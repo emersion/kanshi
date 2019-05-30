@@ -4,19 +4,9 @@ Kanshi uses a configuration file and a list of available displays to choose the
 right settings for each display. It's useful if your window manager doesn't
 support multiple display configurations (e.g. i3/Sway).
 
-For now, it only supports:
-
-* `sysfs` as backend
-* `udev` as notifier (optional)
-* Configuration file
-	* GNOME (`~/.config/monitors.xml`)
-	* Kanshi (see below)
-* Sway as frontend
-
 ## Usage
 
 ```sh
-cargo install kanshi
 mkdir -p ~/.config/kanshi && touch ~/.config/kanshi/config
 kanshi
 ```
