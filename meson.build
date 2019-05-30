@@ -36,7 +36,7 @@ add_project_arguments(cc.get_supported_arguments([
 
 wayland_client = dependency('wayland-client')
 
-kanshi_inc = include_directories('include')
+subdir('protocol')
 
 executable(
 	meson.project_name(),
@@ -44,7 +44,7 @@ executable(
 		'main.c',
 		'parser.c',
 	),
-	include_directories: kanshi_inc,
-	dependencies: [wayland_client],
+	include_directories: include_directories('include'),
+	dependencies: [wayland_client, client_protos],
 	install: true,
 )
