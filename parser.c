@@ -121,20 +121,104 @@ static bool parser_expect_token(struct kanshi_parser *parser,
 	return true;
 }
 
-static bool parse_mode(struct kanshi_profile_output *output, const char *str) {
-	return true; // TODO
+static bool parse_int(int *dst, const char *str) {
+	char *end;
+	errno = 0;
+	int v = strtol(str, &end, 10);
+	if (errno != 0 || end[0] != '\0' || str[0] == '\0') {
+		return false;
+	}
+	*dst = v;
+	return true;
 }
 
-static bool parse_position(struct kanshi_profile_output *output, const char *str) {
-	return true; // TODO
+static bool parse_mode(struct kanshi_profile_output *output, char *str) {
+	const char *width = strtok(str, "x");
+	const char *height = strtok(NULL, "@");
+	const char *refresh = strtok(NULL, "");
+
+	if (width == NULL || height == NULL) {
+		fprintf(stderr, "invalid output mode: missing width/height\n");
+		return false;
+	}
+
+	if (!parse_int(&output->mode.width, width)) {
+		fprintf(stderr, "invalid output mode: invalid width\n");
+		return false;
+	}
+	if (!parse_int(&output->mode.height, height)) {
+		fprintf(stderr, "invalid output mode: invalid height\n");
+		return false;
+	}
+
+	if (refresh != NULL) {
+		char *end;
+		errno = 0;
+		float v = strtof(refresh, &end);
+		if (errno != 0 || (end[0] != '\0' && strcmp(end, "Hz") != 0) ||
+				str[0] == '\0') {
+			fprintf(stderr, "invalid output mode: invalid refresh rate\n");
+			return false;
+		}
+		output->mode.refresh = v;
+	}
+
+	return true;
+}
+
+static bool parse_position(struct kanshi_profile_output *output, char *str) {
+	const char *x = strtok(str, ",");
+	const char *y = strtok(NULL, "");
+
+	if (x == NULL || y == NULL) {
+		fprintf(stderr, "invalid output position: missing x/y\n");
+		return false;
+	}
+
+	if (!parse_int(&output->position.x, x)) {
+		fprintf(stderr, "invalid output position: invalid x\n");
+		return false;
+	}
+	if (!parse_int(&output->position.y, y)) {
+		fprintf(stderr, "invalid output position: invalid y\n");
+		return false;
+	}
+
+	return true;
 }
 
 static bool parse_float(float *dst, const char *str) {
-	return true; // TODO
+	char *end;
+	errno = 0;
+	float v = strtof(str, &end);
+	if (errno != 0 || end[0] != '\0' || str[0] == '\0') {
+		return false;
+	}
+	*dst = v;
+	return true;
 }
 
 static bool parse_transform(enum wl_output_transform *dst, const char *str) {
-	return true; // TODO
+	if (strcmp(str, "normal") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_NORMAL;
+	} else if (strcmp(str, "90") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_90;
+	} else if (strcmp(str, "180") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_180;
+	} else if (strcmp(str, "270") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_270;
+	} else if (strcmp(str, "flipped") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_FLIPPED;
+	} else if (strcmp(str, "flipped-90") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_FLIPPED_90;
+	} else if (strcmp(str, "flipped-180") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_FLIPPED_180;
+	} else if (strcmp(str, "flipped-270") == 0) {
+		*dst = WL_OUTPUT_TRANSFORM_FLIPPED_270;
+	} else {
+		return false;
+	}
+	return true;
 }
 
 static struct kanshi_profile_output *parse_profile_output(
@@ -156,7 +240,7 @@ static struct kanshi_profile_output *parse_profile_output(
 		switch (parser->tok_type) {
 		case KANSHI_TOKEN_STR:
 			if (has_key) {
-				const char *value = parser->tok_str;
+				char *value = parser->tok_str;
 				switch (key) {
 				case KANSHI_OUTPUT_MODE:
 					if (!parse_mode(output, value)) {
