@@ -4,6 +4,8 @@ Kanshi uses a configuration file and a list of available displays to choose the
 right settings for each display. It's useful if your window manager doesn't
 support multiple display configurations (e.g. i3/Sway).
 
+Join the IRC channel: ##emersion on Freenode.
+
 ## Usage
 
 ```sh
