@@ -16,7 +16,7 @@ kanshi
 ### Configuration file
 
 Each monitor configuration is delimited by brackets. Each line has the same
-syntax as `sway(5)`.
+syntax as `sway-output(5)`.
 
 ```
 {
