@@ -23,7 +23,7 @@ syntax as `sway(5)`.
 }
 
 {
-	output LVDS-1 vendor CMN product 0x1484 serial 0x0 resolution 1600x900 scale 2
+	output LVDS-1 resolution 1600x900 scale 2
 }
 ```
 
