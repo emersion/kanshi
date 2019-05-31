@@ -330,7 +330,12 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 				if (output == NULL) {
 					return NULL;
 				}
-				wl_list_insert(&profile->outputs, &output->link);
+				// Store wildcard outputs at the end of the list
+				if (strcmp(output->name, "*") == 0) {
+					wl_list_insert(profile->outputs.prev, &output->link);
+				} else {
+					wl_list_insert(&profile->outputs, &output->link);
+				}
 			} else {
 				fprintf(stderr, "unknown directive '%s' in profile\n",
 					directive);
@@ -367,7 +372,8 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 			return NULL;
 		}
 
-		wl_list_insert(&config->profiles, &profile->link);
+		// Inset at the end to preserve ordering
+		wl_list_insert(config->profiles.prev, &profile->link);
 	}
 }
 

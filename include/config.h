@@ -1,6 +1,7 @@
 #ifndef KANSHI_CONFIG_H
 #define KANSHI_CONFIG_H
 
+#include <stdbool.h>
 #include <wayland-client.h>
 
 enum kanshi_output_field {
@@ -30,6 +31,7 @@ struct kanshi_profile_output {
 
 struct kanshi_profile {
 	struct wl_list link;
+	// Wildcard outputs are stored at the end of the list
 	struct wl_list outputs;
 };
 
