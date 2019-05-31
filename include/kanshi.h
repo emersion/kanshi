@@ -43,8 +43,11 @@ struct kanshi_state {
 	bool running;
 	struct zwlr_output_manager_v1 *output_manager;
 
+	struct kanshi_config *config;
+
 	struct wl_list heads;
 	uint32_t serial;
+	struct kanshi_profile *current_profile;
 };
 
 #endif

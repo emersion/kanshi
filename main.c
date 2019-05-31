@@ -1,12 +1,82 @@
 #define _POSIX_C_SOURCE 200809L
+#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-client.h>
 
+#include "config.h"
 #include "kanshi.h"
 #include "parser.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
+
+#define HEADS_MAX 64
+
+static bool match_profile_output(struct kanshi_profile_output *output,
+		struct kanshi_head *head) {
+	// TODO: improve vendor/model/serial matching
+	return strcmp(output->name, "*") == 0 ||
+		strcmp(output->name, head->name) == 0 ||
+		strstr(head->description, output->name) != NULL;
+}
+
+static bool match_profile(struct kanshi_state *state,
+		struct kanshi_profile *profile,
+		struct kanshi_head *matches[static HEADS_MAX]) {
+	if (wl_list_length(&profile->outputs) != wl_list_length(&state->heads)) {
+		return false;
+	}
+
+	memset(matches, 0, HEADS_MAX * sizeof(struct kanshi_head *));
+
+	// Wildcards are stored at the end of the list, so those will be matched
+	// last
+	struct kanshi_profile_output *profile_output;
+	wl_list_for_each(profile_output, &profile->outputs, link) {
+		bool output_matched = false;
+		size_t i = 0;
+		struct kanshi_head *head;
+		wl_list_for_each(head, &state->heads, link) {
+			if (matches[i] != NULL) {
+				continue; // already matched
+			}
+			if (match_profile_output(profile_output, head)) {
+				matches[i] = head;
+				output_matched = true;
+				break;
+			}
+			i++;
+		}
+
+		if (!output_matched) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static struct kanshi_profile *match(struct kanshi_state *state,
+		struct kanshi_head *matches[static HEADS_MAX]) {
+	struct kanshi_profile *profile;
+	wl_list_for_each(profile, &state->config->profiles, link) {
+		if (match_profile(state, profile, matches)) {
+			return profile;
+		}
+	}
+	return NULL;
+}
+
+
+static void apply_profile(struct kanshi_state *state,
+		struct kanshi_profile *profile,
+		struct kanshi_head **matches) {
+	if (state->current_profile == profile) {
+		return;
+	}
+
+	// TODO
+}
 
 
 static void mode_handle_size(void *data, struct zwlr_output_mode_v1 *wlr_mode,
@@ -160,6 +230,16 @@ static void output_manager_handle_done(void *data,
 		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
 	struct kanshi_state *state = data;
 	state->serial = serial;
+
+	assert(wl_list_length(&state->heads) <= HEADS_MAX);
+	struct kanshi_head *matches[HEADS_MAX];
+	struct kanshi_profile *profile = match(state, matches);
+	if (profile != NULL) {
+		fprintf(stderr, "applying profile\n");
+		apply_profile(state, profile, matches);
+	} else {
+		fprintf(stderr, "no profile matched\n");
+	}
 }
 
 static void output_manager_handle_finished(void *data,
@@ -228,6 +308,7 @@ int main(int argc, char *argv[]) {
 
 	struct kanshi_state state = {
 		.running = true,
+		.config = config,
 	};
 	wl_list_init(&state.heads);
 
