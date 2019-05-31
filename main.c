@@ -195,7 +195,7 @@ static const struct wl_registry_listener registry_listener = {
 	.global_remove = registry_handle_global_remove,
 };
 
-int main(int argc, char *argv[]) {
+static struct kanshi_config *read_config(void) {
 	const char config_filename[] = "kanshi/config";
 	char config_path[PATH_MAX];
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
@@ -208,10 +208,14 @@ int main(int argc, char *argv[]) {
 			home, config_filename);
 	} else {
 		fprintf(stderr, "HOME not set\n");
-		return EXIT_FAILURE;
+		return NULL;
 	}
 
-	struct kanshi_config *config = parse_config(config_path);
+	return parse_config(config_path);
+}
+
+int main(int argc, char *argv[]) {
+	struct kanshi_config *config = read_config();
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
