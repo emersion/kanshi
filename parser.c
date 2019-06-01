@@ -59,6 +59,38 @@ static int parser_peek_char(struct kanshi_parser *parser) {
 	return ch;
 }
 
+static bool parser_append_tok_ch(struct kanshi_parser *parser, char ch) {
+	// Always keep enough room for a terminating NULL char
+	if (parser->tok_str_len + 1 >= sizeof(parser->tok_str)) {
+		fprintf(stderr, "string too long\n");
+		return false;
+	}
+	parser->tok_str[parser->tok_str_len] = ch;
+	parser->tok_str_len++;
+	return true;
+}
+
+static bool parser_read_quoted(struct kanshi_parser *parser) {
+	while (1) {
+		int ch = parser_read_char(parser);
+		if (ch < 0) {
+			return false;
+		} else if (ch == '\0') {
+			fprintf(stderr, "unterminated quoted string\n");
+			return false;
+		}
+
+		if (ch == '"') {
+			parser->tok_str[parser->tok_str_len] = '\0';
+			return true;
+		}
+
+		if (!parser_append_tok_ch(parser, ch)) {
+			return false;
+		}
+	}
+}
+
 static bool parser_read_str(struct kanshi_parser *parser) {
 	while (1) {
 		int ch = parser_peek_char(parser);
@@ -66,18 +98,14 @@ static bool parser_read_str(struct kanshi_parser *parser) {
 			return false;
 		}
 
-		if (isspace(ch) || ch == '{' || ch == '}') {
+		if (isspace(ch) || ch == '{' || ch == '}' || ch == '\0') {
 			parser->tok_str[parser->tok_str_len] = '\0';
 			return true;
 		}
 
-		// Always keep enough room for a terminating NULL char
-		if (parser->tok_str_len + 1 >= sizeof(parser->tok_str)) {
-			fprintf(stderr, "string too long\n");
+		if (!parser_append_tok_ch(parser, parser_read_char(parser))) {
 			return false;
 		}
-		parser->tok_str[parser->tok_str_len] = parser_read_char(parser);
-		parser->tok_str_len++;
 	}
 }
 
@@ -99,6 +127,10 @@ static bool parser_next_token(struct kanshi_parser *parser) {
 			return true;
 		} else if (isspace(ch)) {
 			continue;
+		} else if (ch == '"') {
+			parser->tok_type = KANSHI_TOKEN_STR;
+			parser->tok_str_len = 0;
+			return parser_read_quoted(parser);
 		} else {
 			parser->tok_type = KANSHI_TOKEN_STR;
 			parser->tok_str[0] = ch;
