@@ -1,10 +1,20 @@
 # kanshi
 
-Kanshi uses a configuration file and a list of available displays to choose the
-right settings for each display. It's useful if your window manager doesn't
-support multiple display configurations (e.g. i3/Sway).
+kanshi allows you to define output profiles that are automatically enabled and
+disabled on hotplug. For instance, this can be used to turn a laptop's internal
+screen off when docked.
+
+This is a Wayland equivalent for tools like [autorandr]. kanshi can be used on
+Wayland compositors supporting the wlr-output-management protocol.
 
 Join the IRC channel: ##emersion on Freenode.
+
+## Building
+
+```sh
+meson build
+ninja -C build
+```
 
 ## Usage
 
@@ -13,22 +23,25 @@ mkdir -p ~/.config/kanshi && touch ~/.config/kanshi/config
 kanshi
 ```
 
-### Configuration file
+## Configuration file
 
-Each monitor configuration is delimited by brackets. Each line has the same
-syntax as `sway-output(5)`.
+Each output profile is delimited by brackets. It contains several `output`
+directives (whose syntax is similar to `sway-output(5)`). A profile will be
+enabled if all of the listed outputs are connected.
 
 ```
 {
 	output LVDS-1 disable
-	output VGA-1 resolution 1600x900 position 0,0
+	output VGA-1 mode 1600x900 position 0,0
 }
 
 {
-	output LVDS-1 resolution 1600x900 scale 2
+	output LVDS-1 enable scale 2
 }
 ```
 
 ## License
 
 MIT
+
+[autorandr]: https://github.com/phillipberndt/autorandr
