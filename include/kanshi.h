@@ -50,4 +50,9 @@ struct kanshi_state {
 	struct kanshi_profile *current_profile;
 };
 
+struct kanshi_pending_profile {
+	struct kanshi_state *state;
+	struct kanshi_profile *profile;
+};
+
 #endif

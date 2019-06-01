@@ -68,14 +68,119 @@ static struct kanshi_profile *match(struct kanshi_state *state,
 }
 
 
+static void config_handle_succeeded(void *data,
+		struct zwlr_output_configuration_v1 *config) {
+	struct kanshi_pending_profile *pending = data;
+	zwlr_output_configuration_v1_destroy(config);
+	fprintf(stderr, "configuration applied\n");
+	pending->state->current_profile = pending->profile;
+	free(pending);
+}
+
+static void config_handle_failed(void *data,
+		struct zwlr_output_configuration_v1 *config) {
+	struct kanshi_pending_profile *pending = data;
+	zwlr_output_configuration_v1_destroy(config);
+	fprintf(stderr, "failed to apply configuration\n");
+	free(pending);
+}
+
+static void config_handle_cancelled(void *data,
+		struct zwlr_output_configuration_v1 *config) {
+	struct kanshi_pending_profile *pending = data;
+	zwlr_output_configuration_v1_destroy(config);
+	// Wait for new serial
+	fprintf(stderr, "configuration cancelled, retrying\n");
+	free(pending);
+}
+
+static const struct zwlr_output_configuration_v1_listener config_listener = {
+	.succeeded = config_handle_succeeded,
+	.failed = config_handle_failed,
+	.cancelled = config_handle_cancelled,
+};
+
+static struct kanshi_mode *match_mode(struct kanshi_head *head,
+		int width, int height, int refresh) {
+	struct kanshi_mode *mode;
+	wl_list_for_each(mode, &head->modes, link) {
+		if (mode->width == width && mode->height == height &&
+				(refresh == 0 || mode->refresh == refresh)) {
+			return mode;
+		}
+	}
+	return NULL;
+}
+
 static void apply_profile(struct kanshi_state *state,
-		struct kanshi_profile *profile,
-		struct kanshi_head **matches) {
+		struct kanshi_profile *profile, struct kanshi_head **matches) {
 	if (state->current_profile == profile) {
 		return;
 	}
 
-	// TODO
+	struct kanshi_pending_profile *pending = calloc(1, sizeof(*pending));
+	pending->state = state;
+	pending->profile = profile;
+
+	struct zwlr_output_configuration_v1 *config =
+		zwlr_output_manager_v1_create_configuration(state->output_manager,
+		state->serial);
+	zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
+
+	size_t i = 0;
+	struct kanshi_profile_output *profile_output;
+	wl_list_for_each(profile_output, &profile->outputs, link) {
+		struct kanshi_head *head = matches[i];
+
+		bool enabled = head->enabled;
+		if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
+			enabled = profile_output->enabled;
+		}
+
+		if (!enabled) {
+			zwlr_output_configuration_v1_disable_head(config, head->wlr_head);
+			continue;
+		}
+
+		struct zwlr_output_configuration_head_v1 *config_head =
+			zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
+		if (profile_output->fields & KANSHI_OUTPUT_MODE) {
+			// TODO: support custom modes
+			struct kanshi_mode *mode = match_mode(head,
+				profile_output->mode.width, profile_output->mode.height,
+				profile_output->mode.refresh);
+			if (mode == NULL) {
+				fprintf(stderr,
+					"output '%s' doesn't support mode '%dx%d@%fHz'\n",
+					head->name,
+					profile_output->mode.width, profile_output->mode.height,
+					(float)profile_output->mode.refresh / 1000);
+				goto error;
+			}
+			zwlr_output_configuration_head_v1_set_mode(config_head,
+				mode->wlr_mode);
+		}
+		if (profile_output->fields & KANSHI_OUTPUT_POSITION) {
+			zwlr_output_configuration_head_v1_set_position(config_head,
+				profile_output->position.x, profile_output->position.y);
+		}
+		if (profile_output->fields & KANSHI_OUTPUT_SCALE) {
+			zwlr_output_configuration_head_v1_set_scale(config_head,
+				wl_fixed_from_double(profile_output->scale));
+		}
+		if (profile_output->fields & KANSHI_OUTPUT_TRANSFORM) {
+			zwlr_output_configuration_head_v1_set_transform(config_head,
+				profile_output->transform);
+		}
+
+		i++;
+	}
+
+	zwlr_output_configuration_v1_apply(config);
+	return;
+
+error:
+	zwlr_output_configuration_v1_destroy(config);
 }
 
 
@@ -140,7 +245,7 @@ static void head_handle_mode(void *data,
 	struct kanshi_mode *mode = calloc(1, sizeof(*mode));
 	mode->head = head;
 	mode->wlr_mode = wlr_mode;
-	wl_list_insert(&head->modes, &mode->link);
+	wl_list_insert(head->modes.prev, &mode->link);
 
 	zwlr_output_mode_v1_add_listener(wlr_mode, &mode_listener, mode);
 }
