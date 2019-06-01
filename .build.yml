@@ -1,0 +1,14 @@
+image: archlinux
+packages:
+  - meson
+  - wayland
+  - scdoc
+sources:
+  - https://github.com/emersion/kanshi
+tasks:
+  - setup: |
+      cd kanshi
+      meson build -Dauto_features=enabled
+  - build: |
+      cd kanshi
+      ninja -C build
