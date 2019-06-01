@@ -11,6 +11,11 @@ Join the IRC channel: ##emersion on Freenode.
 
 ## Building
 
+Dependencies:
+
+* wayland-client
+* scdoc (optional, for man pages)
+
 ```sh
 meson build
 ninja -C build
