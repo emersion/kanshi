@@ -14,7 +14,7 @@ Example:
 ```
 {
 	output LVDS-1 disable
-	output VGA-1 mode 1600x900 position 0,0
+	output "Some Company ASDF 4242" mode 1600x900 position 0,0
 }
 
 {
