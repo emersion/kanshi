@@ -7,6 +7,8 @@ screen off when docked.
 This is a Wayland equivalent for tools like [autorandr]. kanshi can be used on
 Wayland compositors supporting the wlr-output-management protocol.
 
+Sway users: kanshi requires the latest Git version of Sway.
+
 Join the IRC channel: ##emersion on Freenode.
 
 ## Building
