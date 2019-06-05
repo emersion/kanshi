@@ -128,51 +128,55 @@ static void apply_profile(struct kanshi_state *state,
 	zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
 
 	size_t i = 0;
+	struct kanshi_head *head;
 	struct kanshi_profile_output *profile_output;
-	wl_list_for_each(profile_output, &profile->outputs, link) {
-		struct kanshi_head *head = matches[i];
+	while ((head = matches[i]) != NULL) {
+		wl_list_for_each(profile_output, &profile->outputs, link) {
+			if (!match_profile_output(profile_output, head))
+				continue;
 
-		bool enabled = head->enabled;
-		if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
-			enabled = profile_output->enabled;
-		}
-
-		if (!enabled) {
-			zwlr_output_configuration_v1_disable_head(config, head->wlr_head);
-			continue;
-		}
-
-		struct zwlr_output_configuration_head_v1 *config_head =
-			zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
-		if (profile_output->fields & KANSHI_OUTPUT_MODE) {
-			// TODO: support custom modes
-			struct kanshi_mode *mode = match_mode(head,
-				profile_output->mode.width, profile_output->mode.height,
-				profile_output->mode.refresh);
-			if (mode == NULL) {
-				fprintf(stderr,
-					"output '%s' doesn't support mode '%dx%d@%fHz'\n",
-					head->name,
-					profile_output->mode.width, profile_output->mode.height,
-					(float)profile_output->mode.refresh / 1000);
-				goto error;
+			bool enabled = head->enabled;
+			if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
+				enabled = profile_output->enabled;
 			}
-			zwlr_output_configuration_head_v1_set_mode(config_head,
-				mode->wlr_mode);
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_POSITION) {
-			zwlr_output_configuration_head_v1_set_position(config_head,
-				profile_output->position.x, profile_output->position.y);
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_SCALE) {
-			zwlr_output_configuration_head_v1_set_scale(config_head,
-				wl_fixed_from_double(profile_output->scale));
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_TRANSFORM) {
-			zwlr_output_configuration_head_v1_set_transform(config_head,
-				profile_output->transform);
-		}
 
+			if (!enabled) {
+				zwlr_output_configuration_v1_disable_head(config, head->wlr_head);
+				break;
+			}
+
+			struct zwlr_output_configuration_head_v1 *config_head =
+				zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
+			if (profile_output->fields & KANSHI_OUTPUT_MODE) {
+				// TODO: support custom modes
+				struct kanshi_mode *mode = match_mode(head,
+						profile_output->mode.width, profile_output->mode.height,
+						profile_output->mode.refresh);
+				if (mode == NULL) {
+					fprintf(stderr,
+							"output '%s' doesn't support mode '%dx%d@%fHz'\n",
+							head->name,
+							profile_output->mode.width, profile_output->mode.height,
+							(float)profile_output->mode.refresh / 1000);
+					goto error;
+				}
+				zwlr_output_configuration_head_v1_set_mode(config_head,
+						mode->wlr_mode);
+			}
+			if (profile_output->fields & KANSHI_OUTPUT_POSITION) {
+				zwlr_output_configuration_head_v1_set_position(config_head,
+						profile_output->position.x, profile_output->position.y);
+			}
+			if (profile_output->fields & KANSHI_OUTPUT_SCALE) {
+				zwlr_output_configuration_head_v1_set_scale(config_head,
+						wl_fixed_from_double(profile_output->scale));
+			}
+			if (profile_output->fields & KANSHI_OUTPUT_TRANSFORM) {
+				zwlr_output_configuration_head_v1_set_transform(config_head,
+						profile_output->transform);
+			}
+
+		}
 		i++;
 	}
 
