@@ -41,6 +41,7 @@ struct kanshi_head {
 
 struct kanshi_state {
 	bool running;
+	bool waiting_for_apply;
 	struct zwlr_output_manager_v1 *output_manager;
 
 	struct kanshi_config *config;

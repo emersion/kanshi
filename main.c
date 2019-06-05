@@ -74,6 +74,7 @@ static void config_handle_succeeded(void *data,
 	zwlr_output_configuration_v1_destroy(config);
 	fprintf(stderr, "configuration applied\n");
 	pending->state->current_profile = pending->profile;
+	pending->state->waiting_for_apply = false;
 	free(pending);
 }
 
@@ -82,6 +83,7 @@ static void config_handle_failed(void *data,
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
 	fprintf(stderr, "failed to apply configuration\n");
+	pending->state->waiting_for_apply = false;
 	free(pending);
 }
 
@@ -91,6 +93,7 @@ static void config_handle_cancelled(void *data,
 	zwlr_output_configuration_v1_destroy(config);
 	// Wait for new serial
 	fprintf(stderr, "configuration cancelled, retrying\n");
+	pending->state->waiting_for_apply = false;
 	free(pending);
 }
 
@@ -114,9 +117,13 @@ static struct kanshi_mode *match_mode(struct kanshi_head *head,
 
 static void apply_profile(struct kanshi_state *state,
 		struct kanshi_profile *profile, struct kanshi_head **matches) {
+	while(state->waiting_for_apply);
+
 	if (state->current_profile == profile) {
 		return;
 	}
+
+	fprintf(stderr, "applying profile\n");
 
 	struct kanshi_pending_profile *pending = calloc(1, sizeof(*pending));
 	pending->state = state;
@@ -176,6 +183,7 @@ static void apply_profile(struct kanshi_state *state,
 		i++;
 	}
 
+	state->waiting_for_apply = true;
 	zwlr_output_configuration_v1_apply(config);
 	return;
 
@@ -340,7 +348,6 @@ static void output_manager_handle_done(void *data,
 	struct kanshi_head *matches[HEADS_MAX];
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
-		fprintf(stderr, "applying profile\n");
 		apply_profile(state, profile, matches);
 	} else {
 		fprintf(stderr, "no profile matched\n");
