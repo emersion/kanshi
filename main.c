@@ -130,9 +130,10 @@ static void apply_profile(struct kanshi_state *state,
 		state->serial);
 	zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
 
-	size_t i = 0;
+	ssize_t i = -1;
 	struct kanshi_profile_output *profile_output;
 	wl_list_for_each(profile_output, &profile->outputs, link) {
+		i++;
 		struct kanshi_head *head = matches[i];
 
 		fprintf(stderr, "applying profile output '%s' on connected head '%s'\n",
@@ -178,8 +179,6 @@ static void apply_profile(struct kanshi_state *state,
 			zwlr_output_configuration_head_v1_set_transform(config_head,
 				profile_output->transform);
 		}
-
-		i++;
 	}
 
 	zwlr_output_configuration_v1_apply(config);
