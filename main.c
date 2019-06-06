@@ -35,18 +35,20 @@ static bool match_profile(struct kanshi_state *state,
 	struct kanshi_profile_output *profile_output;
 	wl_list_for_each(profile_output, &profile->outputs, link) {
 		bool output_matched = false;
-		size_t i = 0;
+		ssize_t i = -1;
 		struct kanshi_head *head;
 		wl_list_for_each(head, &state->heads, link) {
+			i++;
+
 			if (matches[i] != NULL) {
 				continue; // already matched
 			}
+
 			if (match_profile_output(profile_output, head)) {
 				matches[i] = head;
 				output_matched = true;
 				break;
 			}
-			i++;
 		}
 
 		if (!output_matched) {
