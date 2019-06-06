@@ -17,7 +17,8 @@ static bool match_profile_output(struct kanshi_profile_output *output,
 	// TODO: improve vendor/model/serial matching
 	return strcmp(output->name, "*") == 0 ||
 		strcmp(output->name, head->name) == 0 ||
-		strstr(head->description, output->name) != NULL;
+		(strchr(output->name, ' ') != NULL &&
+		strstr(head->description, output->name) != NULL);
 }
 
 static bool match_profile(struct kanshi_state *state,
