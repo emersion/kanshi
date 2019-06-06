@@ -132,6 +132,9 @@ static void apply_profile(struct kanshi_state *state,
 	wl_list_for_each(profile_output, &profile->outputs, link) {
 		struct kanshi_head *head = matches[i];
 
+		fprintf(stderr, "applying profile output '%s' on connected head '%s'\n",
+			profile_output->name, head->name);
+
 		bool enabled = head->enabled;
 		if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
 			enabled = profile_output->enabled;
