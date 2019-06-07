@@ -76,7 +76,7 @@ if scdoc.found()
 				sh, '-c', '@0@ < @INPUT@ > @1@'.format(scdoc_prog.path(), output)
 			],
 			install: true,
-			install_dir: join_paths(mandir, section),
+			install_dir: '@0@/man@1@'.format(mandir, section)
 		)
 	endforeach
 endif
