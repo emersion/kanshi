@@ -23,7 +23,7 @@ static bool match_profile_output(struct kanshi_profile_output *output,
 
 static bool match_profile(struct kanshi_state *state,
 		struct kanshi_profile *profile,
-		struct kanshi_head *matches[static HEADS_MAX]) {
+		struct kanshi_profile_output *matches[static HEADS_MAX]) {
 	if (wl_list_length(&profile->outputs) != wl_list_length(&state->heads)) {
 		return false;
 	}
@@ -45,7 +45,7 @@ static bool match_profile(struct kanshi_state *state,
 			}
 
 			if (match_profile_output(profile_output, head)) {
-				matches[i] = head;
+				matches[i] = profile_output;
 				output_matched = true;
 				break;
 			}
@@ -60,7 +60,7 @@ static bool match_profile(struct kanshi_state *state,
 }
 
 static struct kanshi_profile *match(struct kanshi_state *state,
-		struct kanshi_head *matches[static HEADS_MAX]) {
+		struct kanshi_profile_output *matches[static HEADS_MAX]) {
 	struct kanshi_profile *profile;
 	wl_list_for_each(profile, &state->config->profiles, link) {
 		if (match_profile(state, profile, matches)) {
@@ -116,7 +116,8 @@ static struct kanshi_mode *match_mode(struct kanshi_head *head,
 }
 
 static void apply_profile(struct kanshi_state *state,
-		struct kanshi_profile *profile, struct kanshi_head **matches) {
+		struct kanshi_profile *profile,
+		struct kanshi_profile_output **matches) {
 	if (state->current_profile == profile) {
 		return;
 	}
@@ -131,10 +132,10 @@ static void apply_profile(struct kanshi_state *state,
 	zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
 
 	ssize_t i = -1;
-	struct kanshi_profile_output *profile_output;
-	wl_list_for_each(profile_output, &profile->outputs, link) {
+	struct kanshi_head *head;
+	wl_list_for_each(head, &state->heads, link) {
 		i++;
-		struct kanshi_head *head = matches[i];
+		struct kanshi_profile_output *profile_output = matches[i];
 
 		fprintf(stderr, "applying profile output '%s' on connected head '%s'\n",
 			profile_output->name, head->name);
@@ -342,7 +343,8 @@ static void output_manager_handle_done(void *data,
 	state->serial = serial;
 
 	assert(wl_list_length(&state->heads) <= HEADS_MAX);
-	struct kanshi_head *matches[HEADS_MAX];
+	// matches[i] gives the kanshi_profile_output for the i-th head
+	struct kanshi_profile_output *matches[HEADS_MAX];
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
 		fprintf(stderr, "applying profile\n");
