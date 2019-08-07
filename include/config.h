@@ -29,11 +29,17 @@ struct kanshi_profile_output {
 	enum wl_output_transform transform;
 };
 
+struct kanshi_profile_command {
+	struct wl_list link;
+	char *command;
+};
+
 struct kanshi_profile {
 	struct wl_list link;
 	char *name;
 	// Wildcard outputs are stored at the end of the list
 	struct wl_list outputs;
+	struct wl_list commands;
 };
 
 struct kanshi_config {

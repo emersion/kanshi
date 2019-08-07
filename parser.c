@@ -91,6 +91,24 @@ static bool parser_read_quoted(struct kanshi_parser *parser) {
 	}
 }
 
+static bool parser_read_line(struct kanshi_parser *parser) {
+	while (1) {
+		int ch = parser_peek_char(parser);
+		if (ch < 0) {
+			return false;
+		}
+
+		if (ch == '\n' || ch == '\0') {
+			parser->tok_str[parser->tok_str_len] = '\0';
+			return true;
+		}
+
+		if (!parser_append_tok_ch(parser, parser_read_char(parser))) {
+			return false;
+		}
+	}
+}
+
 static bool parser_read_str(struct kanshi_parser *parser) {
 	while (1) {
 		int ch = parser_peek_char(parser);
@@ -338,9 +356,32 @@ static struct kanshi_profile_output *parse_profile_output(
 	}
 }
 
+static struct kanshi_profile_command *parse_profile_command(
+		struct kanshi_parser *parser) {
+	// Skip the 'exec' directive.
+	if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+		return NULL;
+	}
+
+	if (!parser_read_line(parser)) {
+		return NULL;
+	}
+
+	if (parser->tok_str_len <= 0) {
+		fprintf(stderr, "Ignoring empty command in config file on line %d\n",
+			parser->line);
+		return NULL;
+	}
+
+	struct kanshi_profile_command *command = calloc(1, sizeof(*command));
+	command->command = strdup(parser->tok_str);
+	return command;
+}
+
 static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	struct kanshi_profile *profile = calloc(1, sizeof(*profile));
 	wl_list_init(&profile->outputs);
+	wl_list_init(&profile->commands);
 
 	// First parse an optional profile name
 	parser->tok_str_len = 0;
@@ -391,6 +432,14 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 				} else {
 					wl_list_insert(&profile->outputs, &output->link);
 				}
+			} else if (strcmp(directive, "exec") == 0) {
+				struct kanshi_profile_command *command =
+					parse_profile_command(parser);
+				if (command == NULL) {
+					return NULL;
+				}
+				// Insert commands at the end to preserve order
+				wl_list_insert(profile->commands.prev, &command->link);
 			} else {
 				fprintf(stderr, "unknown directive '%s' in profile '%s'\n",
 					directive, profile->name);
