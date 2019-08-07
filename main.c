@@ -1,8 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <wayland-client.h>
 
 #include "config.h"
@@ -71,10 +75,59 @@ static struct kanshi_profile *match(struct kanshi_state *state,
 }
 
 
+static void exec_command(char *cmd) {
+	pid_t pid, child;
+	if ((pid = fork()) == 0) {
+		setsid();
+		sigset_t set;
+		sigemptyset(&set);
+		sigprocmask(SIG_SETMASK, &set, NULL);
+		if ((child = fork()) == 0) {
+			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
+			fprintf(stderr, "Executing command '%s' failed: %s", cmd, strerror(errno));
+			exit(-1);
+		}
+		if (child < 0) {
+			fprintf(stderr, "Impossible to fork a new process to execute"
+					" command '%s': %s", cmd, strerror(errno));
+			exit(0);
+		}
+
+		// Try to give some meaningful information on the command success
+		int wstatus;
+		if (waitpid(child, &wstatus, 0) != child) {
+			perror("waitpid");
+			exit(0);
+		}
+		if (WIFEXITED(wstatus)) {
+			fprintf(stderr, "Command '%s' returned with exit status %d.\n",
+					cmd, WEXITSTATUS(wstatus));
+		} else {
+			fprintf(stderr, "Command '%s' was killed, aborted or disappeared"
+					" in dire circumstances.\n", cmd);
+		}
+		exit(0); // Close child process
+	}
+
+	if (pid < 0) {
+		perror("Impossible to fork a new process");
+	}
+}
+
+static void execute_profile_commands(struct kanshi_profile *profile) {
+	struct kanshi_profile_command *command;
+	wl_list_for_each(command, &profile->commands, link) {
+		fprintf(stderr, "Running command '%s'\n", command->command);
+		exec_command(command->command);
+	}
+}
+
 static void config_handle_succeeded(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
+	fprintf(stderr, "running commands for configuration '%s'\n", pending->profile->name);
+	execute_profile_commands(pending->profile);
 	fprintf(stderr, "configuration for profile '%s' applied\n",
 			pending->profile->name);
 	pending->state->current_profile = pending->profile;
