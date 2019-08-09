@@ -6,8 +6,8 @@ kanshi - configuration file
 
 # DESCRIPTION
 
-A kanshi configuration file is a list of profiles. Each profile is delimited by
-brackets (*{* and *}*) and contains directives.
+A kanshi configuration file is a list of profiles. Each profile starts with an
+optional name and contains directives delimited by brackets (*{* and *}*).
 
 Example:
 
@@ -17,7 +17,7 @@ Example:
 	output "Some Company ASDF 4242" mode 1600x900 position 0,0
 }
 
-{
+nomad {
 	output LVDS-1 enable scale 2
 }
 ```

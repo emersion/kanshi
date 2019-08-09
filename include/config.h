@@ -31,6 +31,7 @@ struct kanshi_profile_output {
 
 struct kanshi_profile {
 	struct wl_list link;
+	char *name;
 	// Wildcard outputs are stored at the end of the list
 	struct wl_list outputs;
 };

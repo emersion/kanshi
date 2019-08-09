@@ -339,13 +339,36 @@ static struct kanshi_profile_output *parse_profile_output(
 }
 
 static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
+	struct kanshi_profile *profile = calloc(1, sizeof(*profile));
+	wl_list_init(&profile->outputs);
+
+	// First parse an optional profile name
+	parser->tok_str_len = 0;
+	if (!parser_read_str(parser)) {
+		fprintf(stderr, "expected new profile, got %s\n",
+			token_type_str(parser->tok_type));
+		return NULL;
+	}
+	profile->name = (parser->tok_str_len == 0) ? NULL : strdup(parser->tok_str);
+
+	// Then parse the opening bracket
 	if (!parser_expect_token(parser, KANSHI_TOKEN_LBRACKET)) {
 		return NULL;
 	}
 
-	struct kanshi_profile *profile = calloc(1, sizeof(*profile));
-	wl_list_init(&profile->outputs);
+	// Use the bracket position to generate a default profile name
+	if (profile->name == NULL) {
+		char generated_name[100];
+		int ret = snprintf(generated_name, sizeof(generated_name),
+				"<anonymous at line %d, col %d>", parser->line, parser->col);
+		if (ret >= 0) {
+			profile->name = strdup(generated_name);
+		} else {
+			profile->name = strdup("<anonymous>");
+		}
+	}
 
+	// Parse the profile commands until the closing bracket
 	while (1) {
 		if (!parser_next_token(parser)) {
 			return NULL;
@@ -369,16 +392,16 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 					wl_list_insert(&profile->outputs, &output->link);
 				}
 			} else {
-				fprintf(stderr, "unknown directive '%s' in profile\n",
-					directive);
+				fprintf(stderr, "unknown directive '%s' in profile '%s'\n",
+					directive, profile->name);
 				return NULL;
 			}
 			break;
 		case KANSHI_TOKEN_NEWLINE:
 			break; // No-op
 		default:
-			fprintf(stderr, "unexpected %s in profile\n",
-				token_type_str(parser->tok_type));
+			fprintf(stderr, "unexpected %s in profile '%s'\n",
+				token_type_str(parser->tok_type), profile->name);
 			return NULL;
 		}
 	}
