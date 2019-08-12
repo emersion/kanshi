@@ -192,7 +192,7 @@ static bool parse_mode(struct kanshi_profile_output *output, char *str) {
 			fprintf(stderr, "invalid output mode: invalid refresh rate\n");
 			return false;
 		}
-		output->mode.refresh = v;
+		output->mode.refresh = v * 1000;
 	}
 
 	return true;
