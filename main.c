@@ -337,11 +337,54 @@ static void output_manager_handle_head(void *data,
 	zwlr_output_head_v1_add_listener(wlr_head, &head_listener, head);
 }
 
+static struct kanshi_config *read_config(void) {
+	const char config_filename[] = "kanshi/config";
+	char config_path[PATH_MAX];
+	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+	const char *home = getenv("HOME");
+	if (xdg_config_home != NULL) {
+		snprintf(config_path, sizeof(config_path), "%s/%s",
+			xdg_config_home, config_filename);
+	} else if (home != NULL) {
+		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
+			home, config_filename);
+	} else {
+		fprintf(stderr, "HOME not set\n");
+		return NULL;
+	}
+
+	return parse_config(config_path);
+}
+
+static void destroy_config(struct kanshi_config *config) {
+  struct kanshi_profile *profile, *tmp_profile;
+  wl_list_for_each_safe(profile, tmp_profile, &config->profiles, link) {
+    struct kanshi_profile_output *output, *tmp_output;
+    wl_list_for_each_safe(output, tmp_output, &profile->outputs, link) {
+      free(output->name);
+      wl_list_remove(&output->link);
+      free(output);
+    }
+    wl_list_remove(&profile->link);
+    free(profile);
+  }
+  free(config);
+}
+
+static void reload_config(struct kanshi_state *state) {
+	struct kanshi_config *config = read_config();
+	if (config != NULL) {
+		destroy_config(state->config);
+		state->config = config;
+	}
+}
+
 static void output_manager_handle_done(void *data,
 		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
 	struct kanshi_state *state = data;
 	state->serial = serial;
 
+	reload_config(state);
 	assert(wl_list_length(&state->heads) <= HEADS_MAX);
 	// matches[i] gives the kanshi_profile_output for the i-th head
 	struct kanshi_profile_output *matches[HEADS_MAX];
@@ -386,25 +429,6 @@ static const struct wl_registry_listener registry_listener = {
 	.global = registry_handle_global,
 	.global_remove = registry_handle_global_remove,
 };
-
-static struct kanshi_config *read_config(void) {
-	const char config_filename[] = "kanshi/config";
-	char config_path[PATH_MAX];
-	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
-	const char *home = getenv("HOME");
-	if (xdg_config_home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/%s",
-			xdg_config_home, config_filename);
-	} else if (home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
-			home, config_filename);
-	} else {
-		fprintf(stderr, "HOME not set\n");
-		return NULL;
-	}
-
-	return parse_config(config_path);
-}
 
 int main(int argc, char *argv[]) {
 	struct kanshi_config *config = read_config();

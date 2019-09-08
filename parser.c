@@ -33,6 +33,7 @@ static int parser_read_char(struct kanshi_parser *parser) {
 		return ch;
 	}
 
+	errno = 0;
 	int ch = fgetc(parser->f);
 	if (ch == EOF) {
 		if (errno != 0) {
@@ -412,7 +413,7 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 struct kanshi_config *parse_config(const char *path) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
-		fprintf(stderr, "failed to open file\n");
+		fprintf(stderr, "failed to open file: %s: %s\n", path, strerror(errno));
 		return NULL;
 	}
 
