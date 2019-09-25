@@ -91,6 +91,19 @@ static bool parser_read_quoted(struct kanshi_parser *parser) {
 	}
 }
 
+static void parser_ignore_line(struct kanshi_parser *parser) {
+	while (1) {
+		int ch = parser_read_char(parser);
+		if (ch < 0) {
+			return;
+		}
+
+		if (ch == '\n' || ch == '\0') {
+			return;
+		}
+	}
+}
+
 static bool parser_read_line(struct kanshi_parser *parser) {
 	while (1) {
 		int ch = parser_peek_char(parser);
@@ -149,6 +162,10 @@ static bool parser_next_token(struct kanshi_parser *parser) {
 			parser->tok_type = KANSHI_TOKEN_STR;
 			parser->tok_str_len = 0;
 			return parser_read_quoted(parser);
+		} else if (ch == '#') {
+			parser_ignore_line(parser);
+			parser->tok_type = KANSHI_TOKEN_NEWLINE;
+			return true;
 		} else {
 			parser->tok_type = KANSHI_TOKEN_STR;
 			parser->tok_str[0] = ch;
@@ -466,6 +483,9 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 			return NULL;
 		} else if (ch == 0) {
 			return config;
+		} else if (ch == '#') {
+			parser_ignore_line(parser);
+			continue;
 		} else if (isspace(ch)) {
 			parser_read_char(parser);
 			continue;
