@@ -1,9 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -14,7 +17,14 @@
 #include "parser.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
+#ifdef KANSHI_HAS_VARLINK
+#include <varlink.h>
+#include "ipc.h"
+#endif
+
 #define HEADS_MAX 64
+
+#define ARRAY_LENGTH(_arr) (sizeof(_arr) / sizeof(*(_arr)))
 
 static bool match_profile_output(struct kanshi_profile_output *output,
 		struct kanshi_head *head) {
@@ -82,6 +92,7 @@ static void exec_command(char *cmd) {
 		sigset_t set;
 		sigemptyset(&set);
 		sigprocmask(SIG_SETMASK, &set, NULL);
+
 		if ((child = fork()) == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
 			fprintf(stderr, "Executing command '%s' failed: %s", cmd, strerror(errno));
@@ -191,13 +202,16 @@ static struct kanshi_mode *match_mode(struct kanshi_head *head,
 static void apply_profile(struct kanshi_state *state,
 		struct kanshi_profile *profile,
 		struct kanshi_profile_output **matches) {
-	if (state->current_profile == profile) {
+	if (state->pending_profile == profile || state->current_profile == profile) {
 		return;
 	}
+
+	fprintf(stderr, "applying profile '%s'\n", profile->name);
 
 	struct kanshi_pending_profile *pending = calloc(1, sizeof(*pending));
 	pending->state = state;
 	pending->profile = profile;
+	state->pending_profile = profile;
 
 	struct zwlr_output_configuration_v1 *config =
 		zwlr_output_manager_v1_create_configuration(state->output_manager,
@@ -256,6 +270,8 @@ static void apply_profile(struct kanshi_state *state,
 	}
 
 	zwlr_output_configuration_v1_apply(config);
+
+	wl_display_roundtrip(state->display);
 	return;
 
 error:
@@ -410,21 +426,25 @@ static void output_manager_handle_head(void *data,
 	zwlr_output_head_v1_add_listener(wlr_head, &head_listener, head);
 }
 
-static void output_manager_handle_done(void *data,
-		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
-	struct kanshi_state *state = data;
-	state->serial = serial;
-
+static bool try_apply_profiles(struct kanshi_state *state) {
 	assert(wl_list_length(&state->heads) <= HEADS_MAX);
 	// matches[i] gives the kanshi_profile_output for the i-th head
 	struct kanshi_profile_output *matches[HEADS_MAX];
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
-		fprintf(stderr, "applying profile '%s'\n", profile->name);
 		apply_profile(state, profile, matches);
-	} else {
-		fprintf(stderr, "no profile matched\n");
+		return true;
 	}
+	fprintf(stderr, "no profile matched\n");
+	return false;
+}
+
+static void output_manager_handle_done(void *data,
+		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
+	struct kanshi_state *state = data;
+	state->serial = serial;
+
+	try_apply_profiles(state);
 }
 
 static void output_manager_handle_finished(void *data,
@@ -479,13 +499,167 @@ static struct kanshi_config *read_config(void) {
 	return parse_config(config_path);
 }
 
+static void destroy_config(struct kanshi_config *config) {
+	struct kanshi_profile *profile, *tmp_profile;
+	wl_list_for_each_safe(profile, tmp_profile, &config->profiles, link) {
+		struct kanshi_profile_output *output, *tmp_output;
+		wl_list_for_each_safe(output, tmp_output, &profile->outputs, link) {
+			free(output->name);
+			wl_list_remove(&output->link);
+			free(output);
+		}
+		struct kanshi_profile_command *command, *tmp_command;
+		wl_list_for_each_safe(command, tmp_command, &profile->commands, link) {
+			free(command->command);
+			wl_list_remove(&command->link);
+			free(command);
+		}
+		wl_list_remove(&profile->link);
+		free(profile);
+	}
+	free(config);
+}
+
+static bool reload_config(struct kanshi_state *state) {
+	fprintf(stderr, "reloading config\n");
+	struct kanshi_config *config = read_config();
+	if (config != NULL) {
+		destroy_config(state->config);
+		state->config = config;
+		state->pending_profile = NULL;
+		state->current_profile = NULL;
+		return try_apply_profiles(state);
+	}
+	return false;
+}
+
+static int do_poll(struct pollfd *fds, nfds_t nfds) {
+	int ret;
+	do {
+		ret = poll(fds, nfds, -1);
+	} while (ret == -1 && errno == EINTR);
+	return ret;
+}
+
+enum readfds_type {
+	FD_WAYLAND		= 0,
+#ifdef KANSHI_HAS_VARLINK
+	FD_VARLINK		= 1,
+#endif
+	FD_COUNT
+};
+
+static int loop(struct kanshi_state *state) {
+	struct pollfd readfds[FD_COUNT];
+	readfds[FD_WAYLAND].fd = wl_display_get_fd(state->display);
+	readfds[FD_WAYLAND].events = POLLIN;
+#ifdef KANSHI_HAS_VARLINK
+	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
+	readfds[FD_VARLINK].events = POLLIN;
+#endif
+
+	struct pollfd writefds[1];
+	writefds[0].fd = readfds[FD_WAYLAND].fd;
+	writefds[0].events = POLLOUT;
+
+	while (state->running) {
+	 while (wl_display_prepare_read(state->display) != 0) {
+			if (wl_display_dispatch_pending(state->display) == -1) {
+				return EXIT_FAILURE;
+			}
+		}
+
+		int ret;
+
+		while (true) {
+			ret = wl_display_flush(state->display);
+			if (ret != -1 || errno != EAGAIN) {
+				break;
+			}
+
+			if (do_poll(writefds, ARRAY_LENGTH(writefds)) == -1) {
+				goto read_error;
+			}
+		}
+
+		if (ret < 0 && errno != EPIPE) {
+			goto read_error;
+		}
+
+		if (do_poll(readfds, ARRAY_LENGTH(readfds)) == -1) {
+			goto read_error;
+		}
+
+		if (wl_display_read_events(state->display) == -1) {
+			return EXIT_FAILURE;
+		}
+
+#ifdef KANSHI_HAS_VARLINK
+		if (readfds[FD_VARLINK].revents & POLLIN) {
+			varlink_return_if_fail(
+					varlink_service_process_events(state->service));
+		}
+#endif
+
+		if (wl_display_dispatch_pending(state->display) == -1) {
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+
+read_error:
+	wl_display_cancel_read(state->display);
+	return EXIT_FAILURE;
+}
+
+#ifdef KANSHI_HAS_VARLINK
+long fr_emersion_kanshi_Reload(VarlinkService *service, VarlinkCall *call,
+		VarlinkObject *parameters, uint64_t flags, void *userdata) {
+	struct kanshi_state *state = userdata;
+	reload_config(state);
+	varlink_call_reply(call, NULL, 0);
+	return 0;
+}
+
+VarlinkService *init_varlink(struct kanshi_state *state) {
+	VarlinkService *service;
+	char address[PATH_MAX];
+	get_ipc_address(address, sizeof(address));
+	if (varlink_service_new(&service,
+			"emersion", "kanshi", "1.1", "https://wayland.emersion.fr/kanshi/",
+			address, -1) < 0) {
+		fprintf(stderr, "Couldn't start kanshi varlink service at %s.\n"
+				"Is the kanshi daemon already running?\n", address);
+		return NULL;
+	}
+
+	const char *interface = "interface fr.emersion.kanshi\n"
+		"method Reload() -> ()";
+
+	long result = varlink_service_add_interface(service, interface,
+			"Reload", fr_emersion_kanshi_Reload, state,
+			NULL);
+	if (result != 0) {
+		fprintf(stderr, "varlink_service_add_interface failed: %s\n",
+				varlink_error_string(-result));
+		varlink_service_free(service);
+		return NULL;
+	}
+
+	return service;
+}
+#endif
+
 int main(int argc, char *argv[]) {
+	struct wl_display *display = NULL;
+
 	struct kanshi_config *config = read_config();
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
 
-	struct wl_display *display = wl_display_connect(NULL);
+	display = wl_display_connect(NULL);
 	if (display == NULL) {
 		fprintf(stderr, "failed to connect to display\n");
 		return EXIT_FAILURE;
@@ -493,8 +667,15 @@ int main(int argc, char *argv[]) {
 
 	struct kanshi_state state = {
 		.running = true,
-		.config = config,
+		.display = display,
+		.config = config
 	};
+#ifdef KANSHI_HAS_VARLINK
+	state.service = init_varlink(&state);
+	if (state.service == NULL) {
+		goto error;
+	}
+#endif
 	wl_list_init(&state.heads);
 
 	struct wl_registry *registry = wl_display_get_registry(display);
@@ -505,12 +686,21 @@ int main(int argc, char *argv[]) {
 	if (state.output_manager == NULL) {
 		fprintf(stderr, "compositor doesn't support "
 			"wlr-output-management-unstable-v1\n");
-		return EXIT_FAILURE;
+		goto error;
 	}
 
-	while (state.running && wl_display_dispatch(display) != -1) {
-		// This space intentionally left blank
-	}
+	int ret = loop(&state);
+	goto done;
 
-	return EXIT_SUCCESS;
+error:
+	ret = EXIT_FAILURE;
+done:
+#ifdef KANSHI_HAS_VARLINK
+	if (state.service) {
+		varlink_service_free(state.service);
+	}
+#endif
+	wl_display_disconnect(display);
+
+	return ret;
 }

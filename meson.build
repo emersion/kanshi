@@ -35,8 +35,21 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+varlink = dependency('libvarlink', required: get_option('varlink'))
 
 subdir('protocol')
+
+kanshi_deps = [
+	wayland_client,
+	client_protos,
+]
+
+kanshi_args = []
+
+if varlink.found()
+	kanshi_deps += varlink
+	kanshi_args += '-DKANSHI_HAS_VARLINK'
+endif
 
 executable(
 	meson.project_name(),
@@ -45,7 +58,8 @@ executable(
 		'parser.c',
 	),
 	include_directories: include_directories('include'),
-	dependencies: [wayland_client, client_protos],
+	dependencies: kanshi_deps,
+	c_args: kanshi_args,
 	install: true,
 )
 
