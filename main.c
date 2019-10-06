@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -443,27 +444,78 @@ static const struct wl_registry_listener registry_listener = {
 	.global_remove = registry_handle_global_remove,
 };
 
-static struct kanshi_config *read_config(void) {
-	const char config_filename[] = "kanshi/config";
-	char config_path[PATH_MAX];
-	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
-	const char *home = getenv("HOME");
-	if (xdg_config_home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/%s",
-			xdg_config_home, config_filename);
-	} else if (home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
-			home, config_filename);
-	} else {
-		fprintf(stderr, "HOME not set\n");
+static int filter_configs(const struct dirent *entry) {
+	return strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0;
+}
+
+static struct kanshi_config *read_configs(void) {
+	struct kanshi_config *config = calloc(1, sizeof(*config));
+	wl_list_init(&config->profiles);
+	if (config == NULL) {
 		return NULL;
 	}
 
-	return parse_config(config_path);
+	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+	const char *home = getenv("HOME");
+	{
+		const char config_filename[] = "kanshi/config";
+		char config_path[PATH_MAX];
+		if (xdg_config_home != NULL) {
+			snprintf(config_path, sizeof(config_path), "%s/%s",
+					xdg_config_home, config_filename);
+		} else if (home != NULL) {
+			snprintf(config_path, sizeof(config_path), "%s/.config/%s",
+					home, config_filename);
+		} else {
+			fprintf(stderr, "HOME not set\n");
+			return NULL;
+		}
+		if (!parse_config(config_path, config)) {
+			return NULL;
+		}
+	}
+
+	{
+		const char config_dirname[] = "kanshi/config.d";
+		char config_dir[PATH_MAX];
+		if (xdg_config_home != NULL) {
+			snprintf(config_dir, sizeof(config_dir), "%s/%s",
+					xdg_config_home, config_dirname);
+		} else if (home != NULL) {
+			snprintf(config_dir, sizeof(config_dir), "%s/.config/%s",
+					home, config_dirname);
+		}
+		struct dirent **config_filenames;
+		int count =
+			scandir(config_dir, &config_filenames, filter_configs, alphasort);
+		if (count < 0 && errno != ENOENT) {
+			fprintf(stderr, "failed to open directory %s: %s\n", config_dir,
+					strerror(errno));
+		}
+		if (count >= 0) {
+			for (int i = 0; i < count; i++) {
+				const char *base = config_filenames[i]->d_name;
+				size_t filename_len = strlen(config_dir) + strlen(base) + 2;
+				char *config_filename = malloc(filename_len);
+				if (config_filename == NULL) {
+					return NULL;
+				}
+				snprintf(config_filename, filename_len, "%s/%s", config_dir, base);
+				if (!parse_config(config_filename, config)) {
+					return NULL;
+				}
+				free(config_filename);
+				free(config_filenames[i]);
+			}
+			free(config_filenames);
+		}
+	}
+
+	return config;
 }
 
 int main(int argc, char *argv[]) {
-	struct kanshi_config *config = read_config();
+	struct kanshi_config *config = read_configs();
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}

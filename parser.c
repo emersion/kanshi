@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -456,16 +455,14 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	}
 }
 
-static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
-	struct kanshi_config *config = calloc(1, sizeof(*config));
-	wl_list_init(&config->profiles);
-
+static bool _parse_config(struct kanshi_parser *parser,
+		struct kanshi_config *config) {
 	while (1) {
 		int ch = parser_peek_char(parser);
 		if (ch < 0) {
-			return NULL;
+			return false;
 		} else if (ch == 0) {
-			return config;
+			return true;
 		} else if (isspace(ch)) {
 			parser_read_char(parser);
 			continue;
@@ -473,19 +470,20 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 
 		struct kanshi_profile *profile = parse_profile(parser);
 		if (!profile) {
-			return NULL;
+			return false;
 		}
 
 		// Inset at the end to preserve ordering
 		wl_list_insert(config->profiles.prev, &profile->link);
 	}
+	return true;
 }
 
-struct kanshi_config *parse_config(const char *path) {
+bool parse_config(const char *path, struct kanshi_config *config) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
 		fprintf(stderr, "failed to open file\n");
-		return NULL;
+		return false;
 	}
 
 	struct kanshi_parser parser = {
@@ -494,13 +492,13 @@ struct kanshi_config *parse_config(const char *path) {
 		.line = 1,
 	};
 
-	struct kanshi_config *config = _parse_config(&parser);
+	bool result = _parse_config(&parser, config);
 	fclose(f);
-	if (config == NULL) {
-		fprintf(stderr, "failed to parse config file: "
-			"error on line %d, column %d\n", parser.line, parser.col);
-		return NULL;
+	if (!result) {
+		fprintf(stderr, "failed to parse config file %s: "
+			"error on line %d, column %d\n", path, parser.line, parser.col);
+		return false;
 	}
 
-	return config;
+	return true;
 }

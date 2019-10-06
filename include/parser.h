@@ -1,6 +1,7 @@
 #ifndef KANSHI_PARSER_H
 #define KANSHI_PARSER_H
 
+#include <stdbool.h>
 #include <stdio.h>
 
 struct kanshi_config;
@@ -22,6 +23,6 @@ struct kanshi_parser {
 	size_t tok_str_len;
 };
 
-struct kanshi_config *parse_config(const char *path);
+bool parse_config(const char *path, struct kanshi_config *config);
 
 #endif
