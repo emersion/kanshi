@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -92,6 +93,15 @@ static void exec_command(char *cmd) {
 		sigset_t set;
 		sigemptyset(&set);
 		sigprocmask(SIG_SETMASK, &set, NULL);
+
+		struct sigaction action;
+		sigfillset(&action.sa_mask);
+		action.sa_flags = 0;
+		action.sa_handler = SIG_DFL;
+		sigaction(SIGINT, &action, NULL);
+		sigaction(SIGQUIT, &action, NULL);
+		sigaction(SIGTERM, &action, NULL);
+		sigaction(SIGHUP, &action, NULL);
 
 		if ((child = fork()) == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
@@ -541,18 +551,73 @@ static int do_poll(struct pollfd *fds, nfds_t nfds) {
 	return ret;
 }
 
+static int set_pipe_flags(int fd) {
+	int flags = fcntl(fd, F_GETFL);
+	if (flags == -1) {
+		fprintf(stderr, "fnctl F_GETFL failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) == -1) {
+		fprintf(stderr, "fnctl F_SETFL failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags = fcntl(fd, F_GETFD);
+	if (flags == -1) {
+		fprintf(stderr, "fnctl F_GETFD failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags |= O_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1) {
+		fprintf(stderr, "fnctl F_SETFD failed: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+static int signal_pipefds[2];
+
+static void signal_handler(int signum) {
+	if (write(signal_pipefds[1], &signum, sizeof(signum)) == -1) {
+		_exit(signum | 0x80);
+	}
+}
+
 enum readfds_type {
 	FD_WAYLAND		= 0,
+	FD_SIGNAL		= 1,
 #ifdef KANSHI_HAS_VARLINK
-	FD_VARLINK		= 1,
+	FD_VARLINK		= 2,
 #endif
 	FD_COUNT
 };
 
 static int loop(struct kanshi_state *state) {
+	if (pipe(signal_pipefds) == -1) {
+		fprintf(stderr, "read from signalfd failed: %s\n", strerror(errno));
+		return EXIT_FAILURE;
+	}
+	if (set_pipe_flags(signal_pipefds[0]) == -1) {
+		return EXIT_FAILURE;
+	}
+	if (set_pipe_flags(signal_pipefds[1]) == -1) {
+		return EXIT_FAILURE;
+	}
+
+	struct sigaction action;
+	sigfillset(&action.sa_mask);
+	action.sa_flags = 0;
+	action.sa_handler = signal_handler;
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
+	sigaction(SIGHUP, &action, NULL);
+
 	struct pollfd readfds[FD_COUNT];
 	readfds[FD_WAYLAND].fd = wl_display_get_fd(state->display);
 	readfds[FD_WAYLAND].events = POLLIN;
+	readfds[FD_SIGNAL].fd = signal_pipefds[0];
+	readfds[FD_SIGNAL].events = POLLIN;
 #ifdef KANSHI_HAS_VARLINK
 	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
 	readfds[FD_VARLINK].events = POLLIN;
@@ -600,6 +665,36 @@ static int loop(struct kanshi_state *state) {
 					varlink_service_process_events(state->service));
 		}
 #endif
+
+		if (readfds[FD_SIGNAL].revents & POLLIN) {
+			for (;;) {
+				int signum;
+				ssize_t s
+					= read(readfds[FD_SIGNAL].fd, &signum, sizeof(signum));
+				if (s == 0) {
+					break;
+				}
+				if (s < 0) {
+					if (errno == EAGAIN) {
+						break;
+					}
+					fprintf(stderr, "read from signal pipe failed: %s\n",
+							strerror(errno));
+					return EXIT_FAILURE;
+				}
+				if (s < (ssize_t) sizeof(signum)) {
+					fprintf(stderr, "read too few bytes from signal pipe\n");
+					return EXIT_FAILURE;
+				}
+				switch (signum) {
+				case SIGHUP:
+					reload_config(state);
+					break;
+				default:
+					return signum | 0x80;
+				}
+			}
+		}
 
 		if (wl_display_dispatch_pending(state->display) == -1) {
 			return EXIT_FAILURE;
