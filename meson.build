@@ -63,6 +63,18 @@ executable(
 	install: true,
 )
 
+if varlink.found()
+	executable(
+			meson.project_name() + 'ctl',
+			files(
+				'ctl.c'
+				),
+			include_directories: include_directories('include'),
+			dependencies: [varlink],
+			install: true,
+			)
+endif
+
 scdoc = dependency(
 	'scdoc',
 	version: '>=1.9.2',
@@ -76,6 +88,7 @@ if scdoc.found()
 	man_files = [
 		'kanshi.1.scd',
 		'kanshi.5.scd',
+		'kanshictl.1.scd',
 	]
 	foreach filename : man_files
 		topic = filename.split('.')[-3].split('/')[-1]
