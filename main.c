@@ -461,22 +461,41 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 static struct kanshi_config *read_config(void) {
-	const char config_filename[] = "kanshi/config";
+	const char config_dirname[] = "kanshi";
+	const char config_filename[] = "config";
 	char config_path[PATH_MAX];
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 	const char *home = getenv("HOME");
 	if (xdg_config_home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/%s",
-			xdg_config_home, config_filename);
+		snprintf(config_path, sizeof(config_path), "%s/%s/",
+			xdg_config_home, config_dirname);
 	} else if (home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
-			home, config_filename);
+		snprintf(config_path, sizeof(config_path), "%s/.config/%s/",
+			home, config_dirname);
 	} else {
 		fprintf(stderr, "HOME not set\n");
 		return NULL;
 	}
 
-	return parse_config(config_path);
+	struct kanshi_config *config = calloc(1, sizeof(*config));
+	if (config == NULL) {
+		return NULL;
+	}
+	config->home_dir = home;
+	config->config_dir = strndup(config_path, sizeof(config_path));
+	if (config->config_dir == NULL) {
+		free(config);
+		return NULL;
+	}
+	wl_list_init(&config->profiles);
+
+	strncat(config_path, config_filename, sizeof(config_path) - 1);
+	if (!parse_config(config_path, config)) {
+		free(config->config_dir);
+		free(config);
+		return NULL;
+	}
+	return config;
 }
 
 int main(int argc, char *argv[]) {

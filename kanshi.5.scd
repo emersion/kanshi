@@ -96,6 +96,17 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 	or "flipped", "flipped-90", "flipped-180", "flipped-270" for a rotation and
 	a flip; or "normal" for no transform.
 
+# INCLUDE STATEMENT
+
+Other configuration files can be included with a line beggining with
+*!include*. Include statements cannot be used within a profile.
+
+Example:
+
+```
+!include "extra.conf"
+
+```
 
 # AUTHORS
 

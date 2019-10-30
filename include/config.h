@@ -43,6 +43,8 @@ struct kanshi_profile {
 };
 
 struct kanshi_config {
+	const char *home_dir;
+	char *config_dir;
 	struct wl_list profiles;
 };
 
