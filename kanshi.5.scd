@@ -94,7 +94,7 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 *transform* <transform>
 	Sets the output transform. Can be one of "90", "180", "270" for a rotation;
 	or "flipped", "flipped-90", "flipped-180", "flipped-270" for a rotation and
-	a flip; or "normal" for no transform.
+	a flip; or "0", "normal" for no transform.
 
 
 # AUTHORS

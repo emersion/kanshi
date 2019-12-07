@@ -266,7 +266,7 @@ static bool parse_float(float *dst, const char *str) {
 }
 
 static bool parse_transform(enum wl_output_transform *dst, const char *str) {
-	if (strcmp(str, "normal") == 0) {
+	if (strcmp(str, "normal") == 0 || strcmp(str, "0") == 0) {
 		*dst = WL_OUTPUT_TRANSFORM_NORMAL;
 	} else if (strcmp(str, "90") == 0) {
 		*dst = WL_OUTPUT_TRANSFORM_90;
