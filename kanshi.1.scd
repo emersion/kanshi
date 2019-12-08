@@ -19,7 +19,7 @@ are currently connected. A profile contains configuration for each output.
 # CONFIGURATION
 
 kanshi reads its configuration from *$XDG_CONFIG_HOME/kanshi/config*. If unset,
-$XDG_CONFIG_HOME defaults to *~/.config*.
+*$XDG_CONFIG_HOME* defaults to *~/.config*.
 
 An error is raised if no configuration file is found.
 
