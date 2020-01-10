@@ -159,12 +159,17 @@ static const struct zwlr_output_configuration_v1_listener config_listener = {
 	.cancelled = config_handle_cancelled,
 };
 
+static bool match_refresh(const struct kanshi_mode *mode, int refresh) {
+	int v = refresh - mode->refresh;
+	return abs(v) < 50;
+}
+
 static struct kanshi_mode *match_mode(struct kanshi_head *head,
 		int width, int height, int refresh) {
 	struct kanshi_mode *mode;
 	wl_list_for_each(mode, &head->modes, link) {
 		if (mode->width == width && mode->height == height &&
-				(refresh == 0 || mode->refresh == refresh)) {
+				(refresh == 0 || match_refresh(mode, refresh))) {
 			return mode;
 		}
 	}
