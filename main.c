@@ -167,13 +167,25 @@ static bool match_refresh(const struct kanshi_mode *mode, int refresh) {
 static struct kanshi_mode *match_mode(struct kanshi_head *head,
 		int width, int height, int refresh) {
 	struct kanshi_mode *mode;
+	struct kanshi_mode *last_match = NULL;
+
 	wl_list_for_each(mode, &head->modes, link) {
-		if (mode->width == width && mode->height == height &&
-				(refresh == 0 || match_refresh(mode, refresh))) {
-			return mode;
+		if (mode->width != width || mode->height != height) {
+			continue;
+		}
+
+		if (refresh) {
+			if (match_refresh(mode, refresh)) {
+				return mode;
+			}
+		} else {
+			if (!last_match || mode->refresh > last_match->refresh) {
+				last_match = mode;
+			}
 		}
 	}
-	return NULL;
+
+	return last_match;
 }
 
 static void apply_profile(struct kanshi_state *state,
