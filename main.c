@@ -14,9 +14,11 @@
 #include "parser.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
-#define HEADS_MAX 64
+char const *program_name;
+char const USAGE[] =
+"%s [-1] [-p <PROFILE>]\n";
 
-static bool match_profile_output(struct kanshi_profile_output *output,
+static bool try_match_output_to_head(struct kanshi_profile_output *output,
 		struct kanshi_head *head) {
 	// TODO: improve vendor/model/serial matching
 	return strcmp(output->name, "*") == 0 ||
@@ -25,99 +27,107 @@ static bool match_profile_output(struct kanshi_profile_output *output,
 		strstr(head->description, output->name) != NULL);
 }
 
-static bool match_profile(struct kanshi_state *state,
+// Return true, if all heads in the `state` could be matched to an output in
+// the `profile`.
+//
+// After a successfull call, `pprofile_outputs` will refer to the matched profiles
+// for one-one head in the same order.
+static bool try_match_profile(struct kanshi_state *state,
 		struct kanshi_profile *profile,
-		struct kanshi_profile_output *matches[static HEADS_MAX]) {
-	if (wl_list_length(&profile->outputs) != wl_list_length(&state->heads)) {
-		return false;
-	}
-
-	memset(matches, 0, HEADS_MAX * sizeof(struct kanshi_head *));
-
-	// Wildcards are stored at the end of the list, so those will be matched
-	// last
-	struct kanshi_profile_output *profile_output;
-	wl_list_for_each(profile_output, &profile->outputs, link) {
-		bool output_matched = false;
-		ssize_t i = -1;
-		struct kanshi_head *head;
-		wl_list_for_each(head, &state->heads, link) {
-			i++;
-
-			if (matches[i] != NULL) {
-				continue; // already matched
-			}
-
-			if (match_profile_output(profile_output, head)) {
-				matches[i] = profile_output;
-				output_matched = true;
-				break;
-			}
-		}
-
-		if (!output_matched) {
+		struct kanshi_profile_output ***pprofile_outputs) {
+	if (*pprofile_outputs == NULL) {
+		size_t const num_heads = wl_list_length(&state->heads);
+		*pprofile_outputs = malloc(num_heads * sizeof **pprofile_outputs);
+		if (*pprofile_outputs == NULL) {
+			log_error("failed to allocate memory");
 			return false;
 		}
+	}
+	struct kanshi_profile_output **profile_outputs = *pprofile_outputs;
+
+	struct kanshi_head *head;
+	wl_list_for_each(head, &state->heads, link) {
+		// Try match heads in the order of outputs in the profile.
+		struct kanshi_profile_output *profile_output;
+		wl_list_for_each(profile_output, &profile->outputs, link) {
+			if (try_match_output_to_head(profile_output, head)) {
+				goto head_matched;
+			}
+		}
+		// None of the outputs in the profile matched on this head.
+		return false;
+
+	head_matched:
+		*profile_outputs++ = profile_output;
 	}
 
 	return true;
 }
 
-static struct kanshi_profile *match(struct kanshi_state *state,
-		struct kanshi_profile_output *matches[static HEADS_MAX]) {
+
+static struct kanshi_profile *find_profile_byname(struct kanshi_state *state, char *name) {
 	struct kanshi_profile *profile;
 	wl_list_for_each(profile, &state->config->profiles, link) {
-		if (match_profile(state, profile, matches)) {
+		if (strcmp(profile->name, name) == 0) {
 			return profile;
 		}
 	}
 	return NULL;
 }
 
-
 static void exec_command(char *cmd) {
-	pid_t pid, child;
-	if ((pid = fork()) == 0) {
-		setsid();
+	pid_t child;
+	if ((child = fork()) <= 0) {
+		if (child < 0) {
+			log_errorf("cannot execute command ‘%s’: %s",
+					cmd, strerror(errno));
+		}
+		// Return from parent.
+		return;
+	}
+
+	if ((child = fork()) == 0) {
+		const char *shell = getenv("SHELL");
+		if (shell == NULL)
+			shell = "/bin/sh";
+
+		// Reset signal mask.
 		sigset_t set;
 		sigemptyset(&set);
 		sigprocmask(SIG_SETMASK, &set, NULL);
-		if ((child = fork()) == 0) {
-			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
-			fprintf(stderr, "Executing command '%s' failed: %s", cmd, strerror(errno));
-			exit(-1);
-		}
-		if (child < 0) {
-			fprintf(stderr, "Impossible to fork a new process to execute"
-					" command '%s': %s", cmd, strerror(errno));
-			exit(0);
-		}
 
-		// Try to give some meaningful information on the command success
-		int wstatus;
-		if (waitpid(child, &wstatus, 0) != child) {
-			perror("waitpid");
-			exit(0);
-		}
-		if (WIFEXITED(wstatus)) {
-			fprintf(stderr, "Command '%s' returned with exit status %d.\n",
+		execl(shell, shell, "-c", cmd, NULL);
+		log_errorf("cannot execute command ‘%s’: %s",
+				cmd, strerror(errno));
+		_exit(127);
+	}
+	if (child < 0) {
+		log_errorf("cannot execute command ‘%s’: %s",
+				cmd, strerror(errno));
+		_exit(EXIT_FAILURE);
+	}
+
+	// Try to give some meaningful information on the command success
+	int wstatus;
+	if (waitpid(child, &wstatus, 0) != child) {
+		log_errorf("cannot wait for command ‘%s’: %s",
+				cmd, strerror(errno));
+		_exit(EXIT_FAILURE);
+	}
+	if (WIFEXITED(wstatus)) {
+		if (WEXITSTATUS(wstatus) != EXIT_SUCCESS)
+			log_errorf("command ‘%s’ terminated with exit status %d",
 					cmd, WEXITSTATUS(wstatus));
-		} else {
-			fprintf(stderr, "Command '%s' was killed, aborted or disappeared"
-					" in dire circumstances.\n", cmd);
-		}
-		exit(0); // Close child process
+	} else {
+		log_errorf("command ‘%s‘ received %s",
+				cmd, strsignal(WTERMSIG(wstatus)));
 	}
-
-	if (pid < 0) {
-		perror("Impossible to fork a new process");
-	}
+	_exit(EXIT_SUCCESS);
 }
 
 static void execute_profile_commands(struct kanshi_profile *profile) {
 	struct kanshi_profile_command *command;
 	wl_list_for_each(command, &profile->commands, link) {
-		fprintf(stderr, "Running command '%s'\n", command->command);
 		exec_command(command->command);
 	}
 }
@@ -126,11 +136,15 @@ static void config_handle_succeeded(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
-	fprintf(stderr, "running commands for configuration '%s'\n", pending->profile->name);
+
+	log_infof("profile ‘%s’ configured", pending->profile->name);
+
 	execute_profile_commands(pending->profile);
-	fprintf(stderr, "configuration for profile '%s' applied\n",
-			pending->profile->name);
-	pending->state->current_profile = pending->profile;
+
+	if (pending->state->configure_once) {
+		exit(EXIT_SUCCESS);
+	}
+
 	free(pending);
 }
 
@@ -138,8 +152,14 @@ static void config_handle_failed(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
-	fprintf(stderr, "failed to apply configuration for profile '%s'\n",
+
+	log_errorf("profile ‘%s’ failed",
 			pending->profile->name);
+
+	if (pending->state->configure_once) {
+		exit(EXIT_FAILURE);
+	}
+
 	free(pending);
 }
 
@@ -147,9 +167,15 @@ static void config_handle_cancelled(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
+
 	// Wait for new serial
-	fprintf(stderr, "configuration for profile '%s' cancelled, retrying\n",
+	log_errorf("profile ‘%s’ cancelled",
 			pending->profile->name);
+
+	if (pending->state->configure_once) {
+		exit(EXIT_FAILURE);
+	}
+
 	free(pending);
 }
 
@@ -188,80 +214,157 @@ static struct kanshi_mode *match_mode(struct kanshi_head *head,
 	return last_match;
 }
 
-static void apply_profile(struct kanshi_state *state,
-		struct kanshi_profile *profile,
-		struct kanshi_profile_output **matches) {
-	if (state->current_profile == profile) {
-		return;
+static int apply_output(struct zwlr_output_configuration_v1 *config,
+		struct kanshi_profile_output *profile_output,
+		struct kanshi_head *head,
+		int dry_run) {
+
+	bool enabled = head->enabled;
+	if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
+		enabled = profile_output->enabled;
 	}
 
+	bool changed = enabled != head->enabled;
+
+	if (!enabled) {
+		zwlr_output_configuration_v1_disable_head(config, head->wlr_head);
+		return changed;
+	}
+
+	struct zwlr_output_configuration_head_v1 *config_head =
+		zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
+	if (profile_output->fields & KANSHI_OUTPUT_MODE) {
+		// TODO: support custom modes
+		struct kanshi_mode *mode = match_mode(head,
+			profile_output->mode.width, profile_output->mode.height,
+			profile_output->mode.refresh);
+		if (mode == NULL) {
+			if (!dry_run) {
+				log_errorf("head ‘%s’ doesn't support mode %dx%d @ %.6f Hz",
+					head->name,
+					profile_output->mode.width, profile_output->mode.height,
+					(float)profile_output->mode.refresh / 1000);
+			}
+			return -1;
+		}
+		if (head->mode != mode) {
+			changed = 1;
+			zwlr_output_configuration_head_v1_set_mode(config_head,
+				mode->wlr_mode);
+		}
+	}
+	if ((profile_output->fields & KANSHI_OUTPUT_POSITION) &&
+		(head->position.x != profile_output->position.x ||
+		 head->position.y != profile_output->position.y)) {
+		changed = 1;
+		zwlr_output_configuration_head_v1_set_position(config_head,
+			profile_output->position.x, profile_output->position.y);
+	}
+	if (profile_output->fields & KANSHI_OUTPUT_SCALE) {
+		int head_scale = wl_fixed_from_double(head->scale);
+		int new_scale = wl_fixed_from_double(profile_output->scale);
+		if (head_scale != new_scale) {
+			changed = 1;
+			zwlr_output_configuration_head_v1_set_scale(config_head, new_scale);
+		}
+	}
+	if ((profile_output->fields & KANSHI_OUTPUT_TRANSFORM) &&
+		head->transform != profile_output->transform) {
+		changed = 1;
+		zwlr_output_configuration_head_v1_set_transform(config_head,
+			profile_output->transform);
+	}
+
+	return changed;
+}
+
+// Configure output using `profile`.
+static int apply_profile(struct kanshi_state *state,
+		struct kanshi_profile *profile,
+		struct kanshi_profile_output **profile_outputs,
+		int dry_run) {
 	struct kanshi_pending_profile *pending = calloc(1, sizeof(*pending));
+	if (pending == NULL) {
+		log_error("failed to allocate memory");
+		return -1;
+	}
 	pending->state = state;
 	pending->profile = profile;
 
 	struct zwlr_output_configuration_v1 *config =
 		zwlr_output_manager_v1_create_configuration(state->output_manager,
 		state->serial);
-	zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
 
-	ssize_t i = -1;
+	int ret = -1;
+	bool any_changed = false;
 	struct kanshi_head *head;
 	wl_list_for_each(head, &state->heads, link) {
-		i++;
-		struct kanshi_profile_output *profile_output = matches[i];
+		struct kanshi_profile_output *profile_output = *profile_outputs++;
 
-		fprintf(stderr, "applying profile output '%s' on connected head '%s'\n",
-			profile_output->name, head->name);
-
-		bool enabled = head->enabled;
-		if (profile_output->fields & KANSHI_OUTPUT_ENABLED) {
-			enabled = profile_output->enabled;
-		}
-
-		if (!enabled) {
-			zwlr_output_configuration_v1_disable_head(config, head->wlr_head);
-			continue;
-		}
-
-		struct zwlr_output_configuration_head_v1 *config_head =
-			zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
-		if (profile_output->fields & KANSHI_OUTPUT_MODE) {
-			// TODO: support custom modes
-			struct kanshi_mode *mode = match_mode(head,
-				profile_output->mode.width, profile_output->mode.height,
-				profile_output->mode.refresh);
-			if (mode == NULL) {
-				fprintf(stderr,
-					"output '%s' doesn't support mode '%dx%d@%fHz'\n",
-					head->name,
-					profile_output->mode.width, profile_output->mode.height,
-					(float)profile_output->mode.refresh / 1000);
-				goto error;
+		switch (apply_output(config, profile_output, head, dry_run)) {
+		case -1:
+			// Error occurred.
+			goto error;
+		case 1:
+			// Configuration changed.
+			if (!any_changed) {
+				any_changed = true;
+				if (!dry_run) {
+					log_infof("applying profile ‘%s’", profile->name);
+				}
 			}
-			zwlr_output_configuration_head_v1_set_mode(config_head,
-				mode->wlr_mode);
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_POSITION) {
-			zwlr_output_configuration_head_v1_set_position(config_head,
-				profile_output->position.x, profile_output->position.y);
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_SCALE) {
-			zwlr_output_configuration_head_v1_set_scale(config_head,
-				wl_fixed_from_double(profile_output->scale));
-		}
-		if (profile_output->fields & KANSHI_OUTPUT_TRANSFORM) {
-			zwlr_output_configuration_head_v1_set_transform(config_head,
-				profile_output->transform);
+
+			if (!dry_run) {
+				log_infof("  output ‘%s’ -> head ‘%s’",
+					profile_output->name, head->name);
+			}
+			break;
 		}
 	}
 
-	zwlr_output_configuration_v1_apply(config);
-	return;
+	if (any_changed) {
+		ret = 1;
+		if (!dry_run) {
+			zwlr_output_configuration_v1_add_listener(config, &config_listener, pending);
+			zwlr_output_configuration_v1_apply(config);
+			return ret;
+		}
+	} else {
+		ret = 0;
+		log_info("  nothing to do");
+	}
 
 error:
 	zwlr_output_configuration_v1_destroy(config);
+	return ret;
 }
 
+// Return the first matching profile for a `setup`; or NULL, if there is no
+// such profile.
+static struct kanshi_profile *find_matching_profile(struct kanshi_state *state,
+		struct kanshi_profile_output ***pprofile_outputs) {
+	struct kanshi_profile *profile;
+	wl_list_for_each(profile, &state->config->profiles, link) {
+		if (try_match_profile(state, profile, pprofile_outputs)) {
+			return profile;
+		}
+	}
+	// No matching profile was found for this state.
+	return NULL;
+}
+
+static struct kanshi_profile *find_current_profile(struct kanshi_state *state,
+		struct kanshi_profile_output ***pprofile_outputs) {
+	struct kanshi_profile *profile;
+	wl_list_for_each(profile, &state->config->profiles, link) {
+		if (try_match_profile(state, profile, pprofile_outputs) &&
+		    apply_profile(state, profile, *pprofile_outputs, 1/*dry run*/) == 0) {
+			return profile;
+		}
+	}
+	// No matching profile was found for this state.
+	return NULL;
+}
 
 static void mode_handle_size(void *data, struct zwlr_output_mode_v1 *wlr_mode,
 		int32_t width, int32_t height) {
@@ -322,6 +425,10 @@ static void head_handle_mode(void *data,
 	struct kanshi_head *head = data;
 
 	struct kanshi_mode *mode = calloc(1, sizeof(*mode));
+	if (head == NULL) {
+		log_error("failed to allocate memory");
+		return;
+	}
 	mode->head = head;
 	mode->wlr_mode = wlr_mode;
 	wl_list_insert(head->modes.prev, &mode->link);
@@ -349,15 +456,15 @@ static void head_handle_current_mode(void *data,
 			return;
 		}
 	}
-	fprintf(stderr, "received unknown current_mode\n");
+	log_error("received unknown current_mode");
 	head->mode = NULL;
 }
 
 static void head_handle_position(void *data,
 		struct zwlr_output_head_v1 *wlr_head, int32_t x, int32_t y) {
 	struct kanshi_head *head = data;
-	head->x = x;
-	head->y = y;
+	head->position.x = x;
+	head->position.y = y;
 }
 
 static void head_handle_transform(void *data,
@@ -401,6 +508,10 @@ static void output_manager_handle_head(void *data,
 	struct kanshi_state *state = data;
 
 	struct kanshi_head *head = calloc(1, sizeof(*head));
+	if (head == NULL) {
+		log_error("failed to allocate memory");
+		return;
+	}
 	head->state = state;
 	head->wlr_head = wlr_head;
 	head->scale = 1.0;
@@ -415,21 +526,47 @@ static void output_manager_handle_done(void *data,
 	struct kanshi_state *state = data;
 	state->serial = serial;
 
-	assert(wl_list_length(&state->heads) <= HEADS_MAX);
-	// matches[i] gives the kanshi_profile_output for the i-th head
-	struct kanshi_profile_output *matches[HEADS_MAX];
-	struct kanshi_profile *profile = match(state, matches);
-	if (profile != NULL) {
-		fprintf(stderr, "applying profile '%s'\n", profile->name);
-		apply_profile(state, profile, matches);
+	log_info("configuration changed");
+
+	struct kanshi_profile_output **profile_outputs = NULL;
+	struct kanshi_profile *profile;
+
+	if (state->force_profile == NULL) {
+		// Test if any of the profiles matches exactly the current
+		// configuration.
+		if ((profile = find_current_profile(state, &profile_outputs)) == NULL) {
+			// Select one profile that can be applied to the
+			// current configuration.
+			profile = find_matching_profile(state, &profile_outputs);
+		}
 	} else {
-		fprintf(stderr, "no profile matched\n");
+		profile = find_profile_byname(state, state->force_profile);
+		if (profile && !try_match_profile(state, profile, &profile_outputs)) {
+			// Provided profile found but not available.
+			profile = NULL;
+			if (state->configure_once) {
+				exit(EXIT_FAILURE);
+			}
+		}
+
 	}
+
+	if (profile != NULL) {
+		log_infof("profile ‘%s’ matched", profile->name);
+		if (apply_profile(state, profile, profile_outputs, 0) == 0 &&
+			state->configure_once) {
+			exit(EXIT_SUCCESS);
+		}
+	} else {
+		log_error("no profile matched");
+	}
+
+	free(profile_outputs);
 }
 
 static void output_manager_handle_finished(void *data,
 		struct zwlr_output_manager_v1 *manager) {
-	// This space is intentionally left blank
+	// We handle changes at `output_manager_handle_done`, so nothing to do here.
 }
 
 static const struct zwlr_output_manager_v1_listener output_manager_listener = {
@@ -441,7 +578,6 @@ static const struct zwlr_output_manager_v1_listener output_manager_listener = {
 static void registry_handle_global(void *data, struct wl_registry *registry,
 		uint32_t name, const char *interface, uint32_t version) {
 	struct kanshi_state *state = data;
-
 	if (strcmp(interface, zwlr_output_manager_v1_interface.name) == 0) {
 		state->output_manager = wl_registry_bind(registry, name,
 			&zwlr_output_manager_v1_interface, 1);
@@ -463,16 +599,15 @@ static const struct wl_registry_listener registry_listener = {
 static struct kanshi_config *read_config(void) {
 	const char config_filename[] = "kanshi/config";
 	char config_path[PATH_MAX];
-	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
-	const char *home = getenv("HOME");
-	if (xdg_config_home != NULL) {
+	const char *prefix;
+	if ((prefix = getenv("XDG_CONFIG_HOME")) != NULL) {
 		snprintf(config_path, sizeof(config_path), "%s/%s",
-			xdg_config_home, config_filename);
-	} else if (home != NULL) {
+			prefix, config_filename);
+	} else if ((prefix = getenv("HOME")) != NULL) {
 		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
-			home, config_filename);
+			prefix, config_filename);
 	} else {
-		fprintf(stderr, "HOME not set\n");
+		log_error("HOME not set");
 		return NULL;
 	}
 
@@ -480,6 +615,35 @@ static struct kanshi_config *read_config(void) {
 }
 
 int main(int argc, char *argv[]) {
+	if ((program_name = strrchr(argv[0], '/')) != NULL)
+		++program_name;
+	else
+		program_name = argv[0];
+
+	char *opt_profile = NULL;
+	int opt_once = 0;
+
+	for (char c; (c = getopt (argc, argv, "p:1h")) != -1; ) {
+		switch (c) {
+		case 'p':
+			opt_profile = strdup(optarg);
+			break;
+		case '1':
+			opt_once = 1;
+			break;
+		case 'h':
+			fprintf(stdout, USAGE, program_name);
+			return EXIT_SUCCESS;
+		default:
+			log_error("invalid argument(s)");
+			return EXIT_FAILURE;
+		}
+	}
+	if (optind < argc) {
+		log_error("extra argument(s)");
+		return EXIT_FAILURE;
+	}
+
 	struct kanshi_config *config = read_config();
 	if (config == NULL) {
 		return EXIT_FAILURE;
@@ -487,13 +651,15 @@ int main(int argc, char *argv[]) {
 
 	struct wl_display *display = wl_display_connect(NULL);
 	if (display == NULL) {
-		fprintf(stderr, "failed to connect to display\n");
+		log_error("cannot connect to display");
 		return EXIT_FAILURE;
 	}
 
 	struct kanshi_state state = {
 		.running = true,
 		.config = config,
+		.force_profile = opt_profile,
+		.configure_once = opt_once,
 	};
 	wl_list_init(&state.heads);
 
@@ -503,8 +669,8 @@ int main(int argc, char *argv[]) {
 	wl_display_roundtrip(display);
 
 	if (state.output_manager == NULL) {
-		fprintf(stderr, "compositor doesn't support "
-			"wlr-output-management-unstable-v1\n");
+		log_error("compositor doesn't support "
+			"wlr-output-management-unstable-v1");
 		return EXIT_FAILURE;
 	}
 
@@ -512,5 +678,5 @@ int main(int argc, char *argv[]) {
 		// This space intentionally left blank
 	}
 
-	return EXIT_SUCCESS;
+	return !state.running ? EXIT_SUCCESS : EXIT_FAILURE;
 }

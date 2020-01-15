@@ -10,7 +10,11 @@
 #include <wayland-client.h>
 
 #include "config.h"
+#include "kanshi.h"
 #include "parser.h"
+
+#define log_cfgerrorf(msg, ...) log_errorf("config: " msg, __VA_ARGS__)
+#define log_cfgerror(msg) log_error("config: " msg)
 
 static const char *token_type_str(enum kanshi_token_type t) {
 	switch (t) {
@@ -36,7 +40,7 @@ static int parser_read_char(struct kanshi_parser *parser) {
 	int ch = fgetc(parser->f);
 	if (ch == EOF) {
 		if (errno != 0) {
-			fprintf(stderr, "fgetc failed: %s\n", strerror(errno));
+			log_cfgerrorf("failed to read file: %s", strerror(errno));
 		} else {
 			return '\0';
 		}
@@ -61,8 +65,9 @@ static int parser_peek_char(struct kanshi_parser *parser) {
 
 static bool parser_append_tok_ch(struct kanshi_parser *parser, char ch) {
 	// Always keep enough room for a terminating NULL char
-	if (parser->tok_str_len + 1 >= sizeof(parser->tok_str)) {
-		fprintf(stderr, "string too long\n");
+	if (parser->tok_str_len + 1 >= sizeof parser->tok_str) {
+		log_cfgerrorf("string too long: “%*s…”",
+				(int)parser->tok_str_len, parser->tok_str);
 		return false;
 	}
 	parser->tok_str[parser->tok_str_len] = ch;
@@ -76,7 +81,7 @@ static bool parser_read_quoted(struct kanshi_parser *parser) {
 		if (ch < 0) {
 			return false;
 		} else if (ch == '\0') {
-			fprintf(stderr, "unterminated quoted string\n");
+			log_cfgerror("unterminated quoted string before end-of-file");
 			return false;
 		}
 
@@ -181,7 +186,7 @@ static bool parser_expect_token(struct kanshi_parser *parser,
 		return false;
 	}
 	if (parser->tok_type != want) {
-		fprintf(stderr, "expected %s, got %s\n",
+		log_cfgerrorf("expected %s, got %s",
 			token_type_str(want), token_type_str(parser->tok_type));
 		return false;
 	}
@@ -205,16 +210,18 @@ static bool parse_mode(struct kanshi_profile_output *output, char *str) {
 	const char *refresh = strtok(NULL, "");
 
 	if (width == NULL || height == NULL) {
-		fprintf(stderr, "invalid output mode: missing width/height\n");
+		log_cfgerror("invalid output mode: must be in ‘<width>x<height>[@<rate>[Hz]]’ format");
 		return false;
 	}
 
 	if (!parse_int(&output->mode.width, width)) {
-		fprintf(stderr, "invalid output mode: invalid width\n");
+		log_cfgerrorf("invalid output mode: ‘%s’ is not a valid integer for width",
+				width);
 		return false;
 	}
 	if (!parse_int(&output->mode.height, height)) {
-		fprintf(stderr, "invalid output mode: invalid height\n");
+		log_cfgerrorf("invalid output mode: ‘%s’ is not a valid integer for height",
+				height);
 		return false;
 	}
 
@@ -224,7 +231,8 @@ static bool parse_mode(struct kanshi_profile_output *output, char *str) {
 		float v = strtof(refresh, &end);
 		if (errno != 0 || (end[0] != '\0' && strcmp(end, "Hz") != 0) ||
 				str[0] == '\0') {
-			fprintf(stderr, "invalid output mode: invalid refresh rate\n");
+			log_cfgerrorf("invalid output mode: ‘%s’ is not valid for refresh rate",
+					refresh);
 			return false;
 		}
 		output->mode.refresh = v * 1000;
@@ -238,16 +246,16 @@ static bool parse_position(struct kanshi_profile_output *output, char *str) {
 	const char *y = strtok(NULL, "");
 
 	if (x == NULL || y == NULL) {
-		fprintf(stderr, "invalid output position: missing x/y\n");
+		log_cfgerror("invalid output position: must be in ‘<x>,<y>’ format");
 		return false;
 	}
 
 	if (!parse_int(&output->position.x, x)) {
-		fprintf(stderr, "invalid output position: invalid x\n");
+		log_cfgerrorf("invalid output position: ‘%s’ is not a valid integer for x", x);
 		return false;
 	}
 	if (!parse_int(&output->position.y, y)) {
-		fprintf(stderr, "invalid output position: invalid y\n");
+		log_cfgerrorf("invalid output position: ‘%s’ is not a valid integer for y", y);
 		return false;
 	}
 
@@ -321,13 +329,15 @@ static struct kanshi_profile_output *parse_profile_output(
 					break;
 				case KANSHI_OUTPUT_SCALE:
 					if (!parse_float(&output->scale, value)) {
-						fprintf(stderr, "invalid output scale\n");
+						log_cfgerrorf("‘%s’ is not valid for output scale",
+								value);
 						return NULL;
 					}
 					break;
 				case KANSHI_OUTPUT_TRANSFORM:
 					if (!parse_transform(&output->transform, value)) {
-						fprintf(stderr, "invalid output transform\n");
+						log_cfgerrorf("‘%s’ is not valid for output transform",
+								value);
 						return NULL;
 					}
 					break;
@@ -349,15 +359,15 @@ static struct kanshi_profile_output *parse_profile_output(
 					has_key = false;
 				} else if (strcmp(key_str, "mode") == 0) {
 					key = KANSHI_OUTPUT_MODE;
-				} else if (strcmp(key_str, "position") == 0) {
+				} else if (strcmp(key_str, "position") == 0 ||
+					   strcmp(key_str, "pos") == 0) {
 					key = KANSHI_OUTPUT_POSITION;
 				} else if (strcmp(key_str, "scale") == 0) {
 					key = KANSHI_OUTPUT_SCALE;
 				} else if (strcmp(key_str, "transform") == 0) {
 					key = KANSHI_OUTPUT_TRANSFORM;
 				} else {
-					fprintf(stderr,
-						"unknown directive '%s' in profile output '%s'\n",
+					log_cfgerrorf("unknown directive ‘%s’ in profile output ‘%s’",
 						key_str, output->name);
 					return NULL;
 				}
@@ -366,7 +376,7 @@ static struct kanshi_profile_output *parse_profile_output(
 		case KANSHI_TOKEN_NEWLINE:
 			return output;
 		default:
-			fprintf(stderr, "unexpected %s in output\n",
+			log_cfgerrorf("unexpected %s in output",
 				token_type_str(parser->tok_type));
 			return NULL;
 		}
@@ -385,7 +395,7 @@ static struct kanshi_profile_command *parse_profile_command(
 	}
 
 	if (parser->tok_str_len <= 0) {
-		fprintf(stderr, "Ignoring empty command in config file on line %d\n",
+		log_cfgerrorf("ignoring empty command in line %d",
 			parser->line);
 		return NULL;
 	}
@@ -403,7 +413,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	// First parse an optional profile name
 	parser->tok_str_len = 0;
 	if (!parser_read_str(parser)) {
-		fprintf(stderr, "expected new profile, got %s\n",
+		log_cfgerrorf("expected new profile, got %s",
 			token_type_str(parser->tok_type));
 		return NULL;
 	}
@@ -418,7 +428,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	if (profile->name == NULL) {
 		char generated_name[100];
 		int ret = snprintf(generated_name, sizeof(generated_name),
-				"<anonymous at line %d, col %d>", parser->line, parser->col);
+				"<anonymous at line %d, column %d>", parser->line, parser->col);
 		if (ret >= 0) {
 			profile->name = strdup(generated_name);
 		} else {
@@ -458,7 +468,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 				// Insert commands at the end to preserve order
 				wl_list_insert(profile->commands.prev, &command->link);
 			} else {
-				fprintf(stderr, "unknown directive '%s' in profile '%s'\n",
+				log_cfgerrorf("unknown directive ‘%s’ in profile ‘%s’",
 					directive, profile->name);
 				return NULL;
 			}
@@ -466,7 +476,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 		case KANSHI_TOKEN_NEWLINE:
 			break; // No-op
 		default:
-			fprintf(stderr, "unexpected %s in profile '%s'\n",
+			log_cfgerrorf("unexpected %s in profile ‘%s’",
 				token_type_str(parser->tok_type), profile->name);
 			return NULL;
 		}
@@ -492,7 +502,7 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 		}
 
 		struct kanshi_profile *profile = parse_profile(parser);
-		if (!profile) {
+		if (profile == NULL) {
 			return NULL;
 		}
 
@@ -504,7 +514,7 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 struct kanshi_config *parse_config(const char *path) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
-		fprintf(stderr, "failed to open file\n");
+		log_cfgerrorf("%s: %s", path, strerror(errno));
 		return NULL;
 	}
 
@@ -517,8 +527,8 @@ struct kanshi_config *parse_config(const char *path) {
 	struct kanshi_config *config = _parse_config(&parser);
 	fclose(f);
 	if (config == NULL) {
-		fprintf(stderr, "failed to parse config file: "
-			"error on line %d, column %d\n", parser.line, parser.col);
+		log_cfgerrorf("parse error at line %d, column %d",
+				parser.line, parser.col);
 		return NULL;
 	}
 

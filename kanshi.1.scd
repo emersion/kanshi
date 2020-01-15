@@ -4,17 +4,31 @@ kanshi(1)
 
 kanshi - dynamic output configuration
 
-# DESCRIPTION
-
-*kanshi*
-
 # SYNOPSIS
+
+*kanshi* [-1] [-p _profile_]
+
+# DESCRIPTION
 
 kanshi is a Wayland daemon that automatically configures outputs.
 
 kanshi is configured with a list of output profiles. Each profile contains a set
 of outputs. A profile will be automatically activated if all specified outputs
 are currently connected. A profile contains configuration for each output.
+
+# OPTIONS
+
+*-h*
+	Show help message and quit.
+
+*-p* _profile_
+	Always use _profile_ for configuration; instead of automatically selecting
+	one based on connected devices.
+
+*-1*
+	Do output configuration only once then quit. Return status will indicate
+	whether configuration was successful or not. Default beahivor is to run
+	indefinitely.
 
 # CONFIGURATION
 

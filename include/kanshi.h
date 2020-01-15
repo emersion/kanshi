@@ -2,7 +2,15 @@
 #define KANSHI_KANSHI_H
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <wayland-client.h>
+
+extern char const *program_name;
+
+#define log_infof(msg, ...) fprintf(stdout, "%s: " msg "\n", program_name, __VA_ARGS__)
+#define log_info(msg) fprintf(stdout, "%s: " msg "\n", program_name)
+#define log_error(msg) fprintf(stderr, "%s: " msg "\n", program_name)
+#define log_errorf(msg, ...) fprintf(stderr, "%s: " msg "\n", program_name, __VA_ARGS__)
 
 struct zwlr_output_manager_v1;
 
@@ -32,9 +40,11 @@ struct kanshi_head {
 	struct kanshi_mode *mode;
 	struct {
 		int32_t width, height;
-		int32_t refresh;
+		int32_t refresh; // mHz
 	} custom_mode;
-	int32_t x, y;
+	struct {
+		int32_t x, y;
+	} position;
 	enum wl_output_transform transform;
 	double scale;
 };
@@ -47,7 +57,9 @@ struct kanshi_state {
 
 	struct wl_list heads;
 	uint32_t serial;
-	struct kanshi_profile *current_profile;
+
+	char *force_profile;
+	int configure_once;
 };
 
 struct kanshi_pending_profile {

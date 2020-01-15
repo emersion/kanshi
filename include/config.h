@@ -19,8 +19,8 @@ struct kanshi_profile_output {
 
 	bool enabled;
 	struct {
-		int width, height;
-		int refresh; // mHz
+		int32_t width, height;
+		int32_t refresh; // mHz
 	} mode;
 	struct {
 		int x, y;
