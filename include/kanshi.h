@@ -5,9 +5,6 @@
 #include <wayland-client.h>
 
 struct zwlr_output_manager_v1;
-#ifdef KANSHI_HAS_VARLINK
-typedef struct VarlinkService VarlinkService;
-#endif
 
 struct kanshi_state;
 struct kanshi_head;
@@ -47,7 +44,7 @@ struct kanshi_state {
 	struct wl_display *display;
 	struct zwlr_output_manager_v1 *output_manager;
 #ifdef KANSHI_HAS_VARLINK
-	VarlinkService *service;
+	struct VarlinkService *service;
 #endif
 
 	struct kanshi_config *config;
@@ -62,5 +59,7 @@ struct kanshi_pending_profile {
 	struct kanshi_state *state;
 	struct kanshi_profile *profile;
 };
+
+bool kanshi_reload_config(struct kanshi_state *state);
 
 #endif

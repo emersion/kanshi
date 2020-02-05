@@ -46,17 +46,21 @@ kanshi_deps = [
 
 kanshi_args = []
 
+kanshi_srcs = [
+	'event-loop.c',
+	'main.c',
+	'parser.c',
+]
+
 if varlink.found()
 	kanshi_deps += varlink
 	kanshi_args += '-DKANSHI_HAS_VARLINK'
+	kanshi_srcs += 'ipc.c'
 endif
 
 executable(
 	meson.project_name(),
-	files(
-		'main.c',
-		'parser.c',
-	),
+	kanshi_srcs,
 	include_directories: include_directories('include'),
 	dependencies: kanshi_deps,
 	c_args: kanshi_args,
@@ -68,11 +72,11 @@ if varlink.found()
 			meson.project_name() + 'ctl',
 			files(
 				'ctl.c'
-				),
+			),
 			include_directories: include_directories('include'),
 			dependencies: [varlink],
 			install: true,
-			)
+		)
 endif
 
 scdoc = dependency(

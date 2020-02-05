@@ -1,4 +1,4 @@
-kanshi(1)
+kanshictl(1)
 
 # NAME
 

@@ -1,14 +1,10 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <wayland-client.h>
@@ -18,14 +14,7 @@
 #include "parser.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
-#ifdef KANSHI_HAS_VARLINK
-#include <varlink.h>
-#include "ipc.h"
-#endif
-
 #define HEADS_MAX 64
-
-#define ARRAY_LENGTH(_arr) (sizeof(_arr) / sizeof(*(_arr)))
 
 static bool match_profile_output(struct kanshi_profile_output *output,
 		struct kanshi_head *head) {
@@ -280,8 +269,6 @@ static void apply_profile(struct kanshi_state *state,
 	}
 
 	zwlr_output_configuration_v1_apply(config);
-
-	wl_display_roundtrip(state->display);
 	return;
 
 error:
@@ -530,7 +517,7 @@ static void destroy_config(struct kanshi_config *config) {
 	free(config);
 }
 
-static bool reload_config(struct kanshi_state *state) {
+bool kanshi_reload_config(struct kanshi_state *state) {
 	fprintf(stderr, "reloading config\n");
 	struct kanshi_config *config = read_config();
 	if (config != NULL) {
@@ -543,218 +530,20 @@ static bool reload_config(struct kanshi_state *state) {
 	return false;
 }
 
-static int do_poll(struct pollfd *fds, nfds_t nfds) {
-	int ret;
-	do {
-		ret = poll(fds, nfds, -1);
-	} while (ret == -1 && errno == EINTR);
-	return ret;
-}
-
-static int set_pipe_flags(int fd) {
-	int flags = fcntl(fd, F_GETFL);
-	if (flags == -1) {
-		fprintf(stderr, "fnctl F_GETFL failed: %s\n", strerror(errno));
-		return -1;
-	}
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL, flags) == -1) {
-		fprintf(stderr, "fnctl F_SETFL failed: %s\n", strerror(errno));
-		return -1;
-	}
-	flags = fcntl(fd, F_GETFD);
-	if (flags == -1) {
-		fprintf(stderr, "fnctl F_GETFD failed: %s\n", strerror(errno));
-		return -1;
-	}
-	flags |= O_CLOEXEC;
-	if (fcntl(fd, F_SETFD, flags) == -1) {
-		fprintf(stderr, "fnctl F_SETFD failed: %s\n", strerror(errno));
-		return -1;
-	}
-	return 0;
-}
-
-static int signal_pipefds[2];
-
-static void signal_handler(int signum) {
-	if (write(signal_pipefds[1], &signum, sizeof(signum)) == -1) {
-		_exit(signum | 0x80);
-	}
-}
-
-enum readfds_type {
-	FD_WAYLAND		= 0,
-	FD_SIGNAL		= 1,
-#ifdef KANSHI_HAS_VARLINK
-	FD_VARLINK		= 2,
-#endif
-	FD_COUNT
-};
-
-static int loop(struct kanshi_state *state) {
-	if (pipe(signal_pipefds) == -1) {
-		fprintf(stderr, "read from signalfd failed: %s\n", strerror(errno));
-		return EXIT_FAILURE;
-	}
-	if (set_pipe_flags(signal_pipefds[0]) == -1) {
-		return EXIT_FAILURE;
-	}
-	if (set_pipe_flags(signal_pipefds[1]) == -1) {
-		return EXIT_FAILURE;
-	}
-
-	struct sigaction action;
-	sigfillset(&action.sa_mask);
-	action.sa_flags = 0;
-	action.sa_handler = signal_handler;
-	sigaction(SIGINT, &action, NULL);
-	sigaction(SIGQUIT, &action, NULL);
-	sigaction(SIGTERM, &action, NULL);
-	sigaction(SIGHUP, &action, NULL);
-
-	struct pollfd readfds[FD_COUNT];
-	readfds[FD_WAYLAND].fd = wl_display_get_fd(state->display);
-	readfds[FD_WAYLAND].events = POLLIN;
-	readfds[FD_SIGNAL].fd = signal_pipefds[0];
-	readfds[FD_SIGNAL].events = POLLIN;
-#ifdef KANSHI_HAS_VARLINK
-	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
-	readfds[FD_VARLINK].events = POLLIN;
-#endif
-
-	struct pollfd writefds[1];
-	writefds[0].fd = readfds[FD_WAYLAND].fd;
-	writefds[0].events = POLLOUT;
-
-	while (state->running) {
-	 while (wl_display_prepare_read(state->display) != 0) {
-			if (wl_display_dispatch_pending(state->display) == -1) {
-				return EXIT_FAILURE;
-			}
-		}
-
-		int ret;
-
-		while (true) {
-			ret = wl_display_flush(state->display);
-			if (ret != -1 || errno != EAGAIN) {
-				break;
-			}
-
-			if (do_poll(writefds, ARRAY_LENGTH(writefds)) == -1) {
-				goto read_error;
-			}
-		}
-
-		if (ret < 0 && errno != EPIPE) {
-			goto read_error;
-		}
-
-		if (do_poll(readfds, ARRAY_LENGTH(readfds)) == -1) {
-			goto read_error;
-		}
-
-		if (wl_display_read_events(state->display) == -1) {
-			return EXIT_FAILURE;
-		}
+int kanshi_main_loop(struct kanshi_state *state);
 
 #ifdef KANSHI_HAS_VARLINK
-		if (readfds[FD_VARLINK].revents & POLLIN) {
-			varlink_return_if_fail(
-					varlink_service_process_events(state->service));
-		}
-#endif
-
-		if (readfds[FD_SIGNAL].revents & POLLIN) {
-			for (;;) {
-				int signum;
-				ssize_t s
-					= read(readfds[FD_SIGNAL].fd, &signum, sizeof(signum));
-				if (s == 0) {
-					break;
-				}
-				if (s < 0) {
-					if (errno == EAGAIN) {
-						break;
-					}
-					fprintf(stderr, "read from signal pipe failed: %s\n",
-							strerror(errno));
-					return EXIT_FAILURE;
-				}
-				if (s < (ssize_t) sizeof(signum)) {
-					fprintf(stderr, "read too few bytes from signal pipe\n");
-					return EXIT_FAILURE;
-				}
-				switch (signum) {
-				case SIGHUP:
-					reload_config(state);
-					break;
-				default:
-					return signum | 0x80;
-				}
-			}
-		}
-
-		if (wl_display_dispatch_pending(state->display) == -1) {
-			return EXIT_FAILURE;
-		}
-	}
-
-	return EXIT_SUCCESS;
-
-read_error:
-	wl_display_cancel_read(state->display);
-	return EXIT_FAILURE;
-}
-
-#ifdef KANSHI_HAS_VARLINK
-long fr_emersion_kanshi_Reload(VarlinkService *service, VarlinkCall *call,
-		VarlinkObject *parameters, uint64_t flags, void *userdata) {
-	struct kanshi_state *state = userdata;
-	reload_config(state);
-	varlink_call_reply(call, NULL, 0);
-	return 0;
-}
-
-VarlinkService *init_varlink(struct kanshi_state *state) {
-	VarlinkService *service;
-	char address[PATH_MAX];
-	get_ipc_address(address, sizeof(address));
-	if (varlink_service_new(&service,
-			"emersion", "kanshi", "1.1", "https://wayland.emersion.fr/kanshi/",
-			address, -1) < 0) {
-		fprintf(stderr, "Couldn't start kanshi varlink service at %s.\n"
-				"Is the kanshi daemon already running?\n", address);
-		return NULL;
-	}
-
-	const char *interface = "interface fr.emersion.kanshi\n"
-		"method Reload() -> ()";
-
-	long result = varlink_service_add_interface(service, interface,
-			"Reload", fr_emersion_kanshi_Reload, state,
-			NULL);
-	if (result != 0) {
-		fprintf(stderr, "varlink_service_add_interface failed: %s\n",
-				varlink_error_string(-result));
-		varlink_service_free(service);
-		return NULL;
-	}
-
-	return service;
-}
+int kanshi_init_ipc(struct kanshi_state *state);
+void kanshi_free_ipc(struct kanshi_state *state);
 #endif
 
 int main(int argc, char *argv[]) {
-	struct wl_display *display = NULL;
-
 	struct kanshi_config *config = read_config();
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
 
-	display = wl_display_connect(NULL);
+	struct wl_display *display = wl_display_connect(NULL);
 	if (display == NULL) {
 		fprintf(stderr, "failed to connect to display\n");
 		return EXIT_FAILURE;
@@ -765,10 +554,11 @@ int main(int argc, char *argv[]) {
 		.display = display,
 		.config = config
 	};
+	int ret = EXIT_SUCCESS;
 #ifdef KANSHI_HAS_VARLINK
-	state.service = init_varlink(&state);
-	if (state.service == NULL) {
-		goto error;
+	if (kanshi_init_ipc(&state) != 0) {
+		ret = EXIT_FAILURE;
+		goto done;
 	}
 #endif
 	wl_list_init(&state.heads);
@@ -781,19 +571,15 @@ int main(int argc, char *argv[]) {
 	if (state.output_manager == NULL) {
 		fprintf(stderr, "compositor doesn't support "
 			"wlr-output-management-unstable-v1\n");
-		goto error;
+		ret = EXIT_FAILURE;
+		goto done;
 	}
 
-	int ret = loop(&state);
-	goto done;
+	ret = kanshi_main_loop(&state);
 
-error:
-	ret = EXIT_FAILURE;
 done:
 #ifdef KANSHI_HAS_VARLINK
-	if (state.service) {
-		varlink_service_free(state.service);
-	}
+	kanshi_free_ipc(&state);
 #endif
 	wl_display_disconnect(display);
 
