@@ -144,7 +144,7 @@ static bool parser_next_token(struct kanshi_parser *parser) {
 	while (1) {
 		int ch = parser_read_char(parser);
 		if (ch < 0) {
-			return ch;
+			return false;
 		}
 
 		if (ch == '{') {
