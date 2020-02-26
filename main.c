@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,8 +22,7 @@ static bool match_profile_output(struct kanshi_profile_output *output,
 	// TODO: improve vendor/model/serial matching
 	return strcmp(output->name, "*") == 0 ||
 		strcmp(output->name, head->name) == 0 ||
-		(strchr(output->name, ' ') != NULL &&
-		strstr(head->description, output->name) != NULL);
+		fnmatch(output->name, head->description, 0) == 0;
 }
 
 static bool match_profile(struct kanshi_state *state,

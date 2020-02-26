@@ -30,7 +30,7 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 *output* <criteria> <output-command...>
 	An output directive adds an output to the profile. The criteria can either
 	be an output name, an output description or "\*". The latter can be used to
-	match any output.
+	match any output. The output description can contain shell glob patterns.
 
 	On *sway*(1), output names and descriptions can be obtained via
 	*swaymsg -t get_outputs*.

@@ -45,6 +45,15 @@ enabled if all of the listed outputs are connected.
 }
 ```
 
+Output profiles can contain shell glob patterns:
+```
+{
+
+	output LVDS-1 disable
+	output "Some Company *" mode 1600x900 position 0,0
+}
+```
+
 ## License
 
 MIT
