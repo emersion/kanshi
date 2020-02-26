@@ -32,7 +32,8 @@ kanshi
 
 Each output profile is delimited by brackets. It contains several `output`
 directives (whose syntax is similar to `sway-output(5)`). A profile will be
-enabled if all of the listed outputs are connected.
+enabled if all of the listed outputs are connected. The first matching
+profile will be picked.
 
 ```
 {
