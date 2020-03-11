@@ -460,17 +460,17 @@ static const struct wl_registry_listener registry_listener = {
 	.global_remove = registry_handle_global_remove,
 };
 
-static struct kanshi_config *read_config(void) {
-	const char config_filename[] = "kanshi/config";
+static struct kanshi_config *read_config(char *config_filename) {
 	char config_path[PATH_MAX];
+	const char config_folder[] = "kanshi/";
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 	const char *home = getenv("HOME");
 	if (xdg_config_home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/%s",
-			xdg_config_home, config_filename);
+		snprintf(config_path, sizeof(config_path), "%s/%s/%s",
+			xdg_config_home, config_folder, config_filename);
 	} else if (home != NULL) {
-		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
-			home, config_filename);
+		snprintf(config_path, sizeof(config_path), "%s/.config/%s/%s",
+			home, config_folder, config_filename);
 	} else {
 		fprintf(stderr, "HOME not set\n");
 		return NULL;
@@ -480,7 +480,10 @@ static struct kanshi_config *read_config(void) {
 }
 
 int main(int argc, char *argv[]) {
-	struct kanshi_config *config = read_config();
+	char *config_filename = "config";
+	if(argc > 1) config_filename = argv[1];
+
+	struct kanshi_config *config = read_config(config_filename);
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
