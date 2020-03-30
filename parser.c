@@ -400,18 +400,23 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	wl_list_init(&profile->outputs);
 	wl_list_init(&profile->commands);
 
-	// First parse an optional profile name
-	parser->tok_str_len = 0;
-	if (!parser_read_str(parser)) {
-		fprintf(stderr, "expected new profile, got %s\n",
-			token_type_str(parser->tok_type));
+	if (!parser_next_token(parser)) {
 		return NULL;
 	}
-	profile->name = (parser->tok_str_len == 0) ? NULL : strdup(parser->tok_str);
 
-	// Then parse the opening bracket
-	if (!parser_expect_token(parser, KANSHI_TOKEN_LBRACKET)) {
-		return NULL;
+	switch (parser->tok_type) {
+	case KANSHI_TOKEN_LBRACKET:
+		break;
+	case KANSHI_TOKEN_STR:
+		// Parse an optional profile name
+		profile->name = strdup(parser->tok_str);
+		if (!parser_expect_token(parser, KANSHI_TOKEN_LBRACKET)) {
+			return NULL;
+		}
+		break;
+	default:
+		fprintf(stderr, "unexpected %s, expected '{' or a profile name\n",
+			token_type_str(parser->tok_type));
 	}
 
 	// Use the bracket position to generate a default profile name
@@ -491,13 +496,30 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 			continue;
 		}
 
-		struct kanshi_profile *profile = parse_profile(parser);
-		if (!profile) {
-			return NULL;
-		}
+		if (ch == '{') {
+			// Legacy profile syntax without a profile directive
+			struct kanshi_profile *profile = parse_profile(parser);
+			if (!profile) {
+				return NULL;
+			}
+			wl_list_insert(config->profiles.prev, &profile->link);
+		} else {
+			if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+				return NULL;
+			}
 
-		// Inset at the end to preserve ordering
-		wl_list_insert(config->profiles.prev, &profile->link);
+			const char *directive = parser->tok_str;
+			if (strcmp(parser->tok_str, "profile") == 0) {
+				struct kanshi_profile *profile = parse_profile(parser);
+				if (!profile) {
+					return NULL;
+				}
+				wl_list_insert(config->profiles.prev, &profile->link);
+			} else {
+				fprintf(stderr, "unknown directive '%s'\n", directive);
+				return NULL;
+			}
+		}
 	}
 }
 

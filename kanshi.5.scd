@@ -6,18 +6,18 @@ kanshi - configuration file
 
 # DESCRIPTION
 
-A kanshi configuration file is a list of profiles. Each profile starts with an
+A kanshi configuration file is a list of profiles. Each profile has an
 optional name and contains directives delimited by brackets (*{* and *}*).
 
 Example:
 
 ```
-{
+profile {
 	output LVDS-1 disable
 	output "Some Company ASDF 4242" mode 1600x900 position 0,0
 }
 
-nomad {
+profile nomad {
 	output LVDS-1 enable scale 2
 }
 ```
@@ -65,7 +65,6 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 	}
 ```
 
-
 # OUTPUT DIRECTIVES
 
 *enable*|*disable*
@@ -95,7 +94,6 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 	Sets the output transform. Can be one of "90", "180", "270" for a rotation;
 	or "flipped", "flipped-90", "flipped-180", "flipped-270" for a rotation and
 	a flip; or "normal" for no transform.
-
 
 # AUTHORS
 
