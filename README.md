@@ -35,12 +35,12 @@ directives (whose syntax is similar to `sway-output(5)`). A profile will be
 enabled if all of the listed outputs are connected.
 
 ```
-{
+profile {
 	output LVDS-1 disable
 	output "Some Company ASDF 4242" mode 1600x900 position 0,0
 }
 
-{
+profile {
 	output LVDS-1 enable scale 2
 }
 ```
