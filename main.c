@@ -227,20 +227,31 @@ static void apply_profile(struct kanshi_state *state,
 		struct zwlr_output_configuration_head_v1 *config_head =
 			zwlr_output_configuration_v1_enable_head(config, head->wlr_head);
 		if (profile_output->fields & KANSHI_OUTPUT_MODE) {
-			// TODO: support custom modes
-			struct kanshi_mode *mode = match_mode(head,
-				profile_output->mode.width, profile_output->mode.height,
-				profile_output->mode.refresh);
-			if (mode == NULL) {
-				fprintf(stderr,
-					"output '%s' doesn't support mode '%dx%d@%fHz'\n",
-					head->name,
+			if (profile_output->mode.custom) {
+				// prints to be removed
+				printf("setting custom mode %s\n", profile_output->name);
+				printf("width %d\n", profile_output->mode.width);
+				printf("height %d\n", profile_output->mode.height);
+				printf("refresh %d\n", profile_output->mode.refresh);
+				zwlr_output_configuration_head_v1_set_custom_mode(config_head,
 					profile_output->mode.width, profile_output->mode.height,
-					(float)profile_output->mode.refresh / 1000);
-				goto error;
+					profile_output->mode.refresh);
+			} else {
+				printf("setting mode %s\n", profile_output->name);
+				struct kanshi_mode *mode = match_mode(head,
+					profile_output->mode.width, profile_output->mode.height,
+					profile_output->mode.refresh);
+				if (mode == NULL) {
+					fprintf(stderr,
+						"output '%s' doesn't support mode '%dx%d@%fHz'\n",
+						head->name,
+						profile_output->mode.width, profile_output->mode.height,
+						(float)profile_output->mode.refresh / 1000);
+					goto error;
+				}
+				zwlr_output_configuration_head_v1_set_mode(config_head,
+					mode->wlr_mode);
 			}
-			zwlr_output_configuration_head_v1_set_mode(config_head,
-				mode->wlr_mode);
 		}
 		if (profile_output->fields & KANSHI_OUTPUT_POSITION) {
 			zwlr_output_configuration_head_v1_set_position(config_head,
