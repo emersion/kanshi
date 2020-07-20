@@ -48,7 +48,7 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 	right output:
 
 ```
-	multihead {
+	profile multihead {
 		output eDP-1 enable
 		output DP-1 enable transform 270
 		exec swaymsg workspace 1, move workspace to eDP-1
@@ -59,7 +59,7 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 	output description as the real name may change:
 
 ```
-	complex {
+	profile complex {
 		output "Some Other Company GTBZ 2525" mode 1920x1200
 		exec swaymsg workspace 1, move workspace to output '"Some Other Company GTBZ 2525"'
 	}
