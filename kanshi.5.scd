@@ -77,15 +77,19 @@ Directives are followed by space-separated arguments. Arguments can be quoted
 
 	Examples:
 
+```
 		output HDMI-A-1 mode 1920x1080
 		output HDMI-A-1 mode 1920x1080@60Hz
+```
 
 *position* <x>,<y>
 	Places the output at the specified position in the global coordinates space.
 
 	Example:
 
+```
 		output HDMI-A-1 position 1600,0
+```
 
 *scale* <factor>
 	Scales the output by the specified scale factor.
