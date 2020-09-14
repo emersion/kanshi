@@ -78,7 +78,9 @@ static struct kanshi_profile *match(struct kanshi_state *state,
 
 static void exec_command(char *cmd) {
 	pid_t pid, child;
+	// Fork process
 	if ((pid = fork()) == 0) {
+		// Fork child process again
 		setsid();
 		sigset_t set;
 		sigemptyset(&set);
@@ -93,26 +95,16 @@ static void exec_command(char *cmd) {
 					" command '%s': %s", cmd, strerror(errno));
 			exit(0);
 		}
-
-		// Try to give some meaningful information on the command success
-		int wstatus;
-		if (waitpid(child, &wstatus, 0) != child) {
-			perror("waitpid");
-			exit(0);
-		}
-		if (WIFEXITED(wstatus)) {
-			fprintf(stderr, "Command '%s' returned with exit status %d.\n",
-					cmd, WEXITSTATUS(wstatus));
-		} else {
-			fprintf(stderr, "Command '%s' was killed, aborted or disappeared"
-					" in dire circumstances.\n", cmd);
-		}
 		exit(0); // Close child process
 	}
 
 	if (pid < 0) {
 		perror("Impossible to fork a new process");
+		return;
 	}
+
+	// cleanup child process
+	waitpid(pid, NULL, 0);
 }
 
 static void execute_profile_commands(struct kanshi_profile *profile) {
