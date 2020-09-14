@@ -100,6 +100,7 @@ static void exec_command(char *cmd) {
 
 	if (pid < 0) {
 		perror("Impossible to fork a new process");
+		return;
 	}
 
 	// cleanup child process
