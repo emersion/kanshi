@@ -41,18 +41,25 @@ struct kanshi_head {
 
 struct kanshi_state {
 	bool running;
+	struct wl_display *display;
 	struct zwlr_output_manager_v1 *output_manager;
+#ifdef KANSHI_HAS_VARLINK
+	struct VarlinkService *service;
+#endif
 
 	struct kanshi_config *config;
 
 	struct wl_list heads;
 	uint32_t serial;
 	struct kanshi_profile *current_profile;
+	struct kanshi_profile *pending_profile;
 };
 
 struct kanshi_pending_profile {
 	struct kanshi_state *state;
 	struct kanshi_profile *profile;
 };
+
+bool kanshi_reload_config(struct kanshi_state *state);
 
 #endif
