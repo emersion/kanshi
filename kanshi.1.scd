@@ -6,7 +6,15 @@ kanshi - dynamic output configuration
 
 # DESCRIPTION
 
-*kanshi*
+*kanshi* [options...]
+
+# OPTIONS
+
+*-h, --help*
+	Show help message and quit.
+
+*-c, --config* <config>
+	Specifies a config file.
 
 # SYNOPSIS
 
