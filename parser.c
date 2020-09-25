@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wordexp.h>
 
 #include <wayland-client.h>
 
@@ -478,16 +479,47 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 	}
 }
 
-static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
-	struct kanshi_config *config = calloc(1, sizeof(*config));
-	wl_list_init(&config->profiles);
+static bool parse_config_file(const char *path, struct kanshi_config *config);
 
+static bool parse_include_command(struct kanshi_parser *parser, struct kanshi_config *config) {
+	// Skip the 'include' directive.
+	if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
+		return false;
+	}
+
+	if (!parser_read_line(parser)) {
+		return false;
+	}
+
+	if (parser->tok_str_len <= 0) {
+		return true;
+	}
+
+	wordexp_t p;
+	if (wordexp(parser->tok_str, &p, WRDE_SHOWERR | WRDE_UNDEF) != 0) {
+		fprintf(stderr, "Could not expand include path: '%s'\n", parser->tok_str);
+		return false;
+	}
+
+	char **w = p.we_wordv;
+	for (size_t idx = 0; idx < p.we_wordc; idx++) {
+		if (!parse_config_file(w[idx], config)) {
+			fprintf(stderr, "Could not parse included config: '%s'\n", w[idx]);
+			wordfree(&p);
+			return false;
+		}
+	}
+	wordfree(&p);
+	return true;
+}
+
+static bool _parse_config(struct kanshi_parser *parser, struct kanshi_config *config) {
 	while (1) {
 		int ch = parser_peek_char(parser);
 		if (ch < 0) {
-			return NULL;
+			return false;
 		} else if (ch == 0) {
-			return config;
+			return true;
 		} else if (ch == '#') {
 			parser_ignore_line(parser);
 			continue;
@@ -500,34 +532,38 @@ static struct kanshi_config *_parse_config(struct kanshi_parser *parser) {
 			// Legacy profile syntax without a profile directive
 			struct kanshi_profile *profile = parse_profile(parser);
 			if (!profile) {
-				return NULL;
+				return false;
 			}
 			wl_list_insert(config->profiles.prev, &profile->link);
 		} else {
 			if (!parser_expect_token(parser, KANSHI_TOKEN_STR)) {
-				return NULL;
+				return false;
 			}
 
 			const char *directive = parser->tok_str;
 			if (strcmp(parser->tok_str, "profile") == 0) {
 				struct kanshi_profile *profile = parse_profile(parser);
 				if (!profile) {
-					return NULL;
+					return false;
 				}
 				wl_list_insert(config->profiles.prev, &profile->link);
+			} else if (strcmp(parser->tok_str, "include") == 0) {
+				if (!parse_include_command(parser, config)) {
+					return false;
+				}
 			} else {
 				fprintf(stderr, "unknown directive '%s'\n", directive);
-				return NULL;
+				return false;
 			}
 		}
 	}
 }
 
-struct kanshi_config *parse_config(const char *path) {
+static bool parse_config_file(const char *path, struct kanshi_config *config) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
 		fprintf(stderr, "failed to open file\n");
-		return NULL;
+		return false;
 	}
 
 	struct kanshi_parser parser = {
@@ -536,11 +572,26 @@ struct kanshi_config *parse_config(const char *path) {
 		.line = 1,
 	};
 
-	struct kanshi_config *config = _parse_config(&parser);
+	bool res = _parse_config(&parser, config);
 	fclose(f);
-	if (config == NULL) {
+	if (!res) {
 		fprintf(stderr, "failed to parse config file: "
 			"error on line %d, column %d\n", parser.line, parser.col);
+		return false;
+	}
+
+	return true;
+}
+
+struct kanshi_config *parse_config(const char *path) {
+	struct kanshi_config *config = calloc(1, sizeof(*config));
+	if (config == NULL) {
+		return NULL;
+	}
+	wl_list_init(&config->profiles);
+
+	if (!parse_config_file(path, config)) {
+		free(config);
 		return NULL;
 	}
 

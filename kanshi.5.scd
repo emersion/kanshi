@@ -6,12 +6,14 @@ kanshi - configuration file
 
 # DESCRIPTION
 
-A kanshi configuration file is a list of profiles. Each profile has an
-optional name and contains directives delimited by brackets (*{* and *}*).
+A kanshi configuration file is a list of profiles. Each profile has an optional
+name and contains profile directives delimited by brackets (*{* and *}*).
 
 Example:
 
 ```
+include /etc/kanshi/config.d/*
+
 profile {
 	output LVDS-1 disable
 	output "Some Company ASDF 4242" mode 1600x900 position 0,0
@@ -24,8 +26,18 @@ profile nomad {
 
 # DIRECTIVES
 
-Directives are followed by space-separated arguments. Arguments can be quoted
-(with *"*) if they contain spaces.
+*profile* [<name>] { <profile directives...> }
+	Defines a new profile using the specified bracket-delimited profile
+	directives. A name can be specified but is optional.
+
+*include* <path>
+	Include as another file from _path_. Expands shell syntax (see *wordexp*(3)
+	for details).
+
+# PROFILE DIRECTIVES
+
+Profile directives are followed by space-separated arguments. Arguments can be
+quoted (with *"*) if they contain spaces.
 
 *output* <criteria> <output-command...>
 	An output directive adds an output to the profile. The criteria can either
