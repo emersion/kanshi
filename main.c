@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
+#include <getopt.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -453,7 +454,11 @@ static const struct wl_registry_listener registry_listener = {
 	.global_remove = registry_handle_global_remove,
 };
 
-static struct kanshi_config *read_config(void) {
+static struct kanshi_config *read_config(const char *config) {
+	if (config != NULL) {
+		return parse_config(config);
+	}
+
 	const char config_filename[] = "kanshi/config";
 	char config_path[PATH_MAX];
 	const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
@@ -472,11 +477,41 @@ static struct kanshi_config *read_config(void) {
 	return parse_config(config_path);
 }
 
+static const char usage[] = "Usage: %s [options...]\n"
+"  -h, --help           Show help message and quit\n"
+"  -c, --config <path>  Path to config file.\n";
+
+static const struct option long_options[] = {
+	{"help", no_argument, 0, 'h'},
+	{"config", required_argument, 0, 'c'},
+	{0},
+};
+
 int main(int argc, char *argv[]) {
-	struct kanshi_config *config = read_config();
+	char *config_arg = NULL;
+
+	int opt;
+	while ((opt = getopt_long(argc, argv, "hc:", long_options, NULL)) != -1) {
+		switch (opt) {
+		case 'c':
+			free(config_arg);
+			config_arg = strdup(optarg);
+			break;
+		case 'h':
+			fprintf(stderr, usage, argv[0]);
+			return EXIT_SUCCESS;
+		default:
+			fprintf(stderr, usage, argv[0]);
+			return EXIT_FAILURE;
+		}
+	}
+
+	struct kanshi_config *config = read_config(config_arg);
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
+
+	free(config_arg);
 
 	struct wl_display *display = wl_display_connect(NULL);
 	if (display == NULL) {
