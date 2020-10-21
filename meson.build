@@ -35,6 +35,7 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+scfg = dependency('scfg')
 
 subdir('protocol')
 
@@ -45,7 +46,7 @@ executable(
 		'parser.c',
 	),
 	include_directories: include_directories('include'),
-	dependencies: [wayland_client, client_protos],
+	dependencies: [wayland_client, client_protos, scfg],
 	install: true,
 )
 
