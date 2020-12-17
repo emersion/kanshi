@@ -299,7 +299,7 @@ static struct kanshi_profile_output *parse_profile_output(
 	output->name = strdup(parser->tok_str);
 
 	bool has_key = false;
-	enum kanshi_output_field key;
+	enum kanshi_output_field key = 0;
 	while (1) {
 		if (!parser_next_token(parser)) {
 			return NULL;
