@@ -71,7 +71,7 @@ static bool parser_append_tok_ch(struct kanshi_parser *parser, char ch) {
 	return true;
 }
 
-static bool parser_read_quoted(struct kanshi_parser *parser) {
+static bool parser_read_quoted(struct kanshi_parser *parser, char quote_char) {
 	while (1) {
 		int ch = parser_read_char(parser);
 		if (ch < 0) {
@@ -81,7 +81,7 @@ static bool parser_read_quoted(struct kanshi_parser *parser) {
 			return false;
 		}
 
-		if (ch == '"') {
+		if (ch == quote_char) {
 			parser->tok_str[parser->tok_str_len] = '\0';
 			return true;
 		}
@@ -159,10 +159,10 @@ static bool parser_next_token(struct kanshi_parser *parser) {
 			return true;
 		} else if (isspace(ch)) {
 			continue;
-		} else if (ch == '"') {
+		} else if (ch == '"' || ch == '\'') {
 			parser->tok_type = KANSHI_TOKEN_STR;
 			parser->tok_str_len = 0;
-			return parser_read_quoted(parser);
+			return parser_read_quoted(parser, ch);
 		} else if (ch == '#') {
 			parser_ignore_line(parser);
 			parser->tok_type = KANSHI_TOKEN_NEWLINE;
