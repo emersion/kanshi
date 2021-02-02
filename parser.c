@@ -1,5 +1,4 @@
 #define _POSIX_C_SOURCE 200809L
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -24,7 +23,7 @@ static const char *token_type_str(enum kanshi_token_type t) {
 	case KANSHI_TOKEN_NEWLINE:
 		return "newline";
 	}
-	assert(0);
+	abort();
 }
 
 static int parser_read_char(struct kanshi_parser *parser) {
@@ -333,7 +332,7 @@ static struct kanshi_profile_output *parse_profile_output(
 					}
 					break;
 				default:
-					assert(0);
+					abort();
 				}
 				has_key = false;
 				output->fields |= key;
