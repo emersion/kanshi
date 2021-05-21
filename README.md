@@ -7,7 +7,7 @@ screen off when docked.
 This is a Wayland equivalent for tools like [autorandr]. kanshi can be used on
 Wayland compositors supporting the wlr-output-management protocol.
 
-Join the IRC channel: ##emersion on Freenode.
+Join the IRC channel: #emersion on Libera Chat.
 
 ## Building
 
