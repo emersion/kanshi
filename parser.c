@@ -561,7 +561,9 @@ static bool _parse_config(struct kanshi_parser *parser, struct kanshi_config *co
 static bool parse_config_file(const char *path, struct kanshi_config *config) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
-		fprintf(stderr, "failed to open file\n");
+		fprintf(stderr, "failed to open file %s: %s\n",
+			path,
+			strerror(errno));
 		return false;
 	}
 
