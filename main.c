@@ -88,11 +88,11 @@ static void exec_command(char *cmd) {
 		sigprocmask(SIG_SETMASK, &set, NULL);
 		if ((child = fork()) == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
-			fprintf(stderr, "Executing command '%s' failed: %s", cmd, strerror(errno));
+			fprintf(stderr, "[kanshi] Executing command '%s' failed: %s", cmd, strerror(errno));
 			exit(-1);
 		}
 		if (child < 0) {
-			fprintf(stderr, "Impossible to fork a new process to execute"
+			fprintf(stderr, "[kanshi] Impossible to fork a new process to execute"
 					" command '%s': %s", cmd, strerror(errno));
 			exit(0);
 		}
@@ -100,7 +100,7 @@ static void exec_command(char *cmd) {
 	}
 
 	if (pid < 0) {
-		perror("Impossible to fork a new process");
+		perror("[kanshi] Impossible to fork a new process");
 		return;
 	}
 
@@ -111,7 +111,7 @@ static void exec_command(char *cmd) {
 static void execute_profile_commands(struct kanshi_profile *profile) {
 	struct kanshi_profile_command *command;
 	wl_list_for_each(command, &profile->commands, link) {
-		fprintf(stderr, "Running command '%s'\n", command->command);
+		fprintf(stderr, "[kanshi] Running command '%s'\n", command->command);
 		exec_command(command->command);
 	}
 }
@@ -120,9 +120,9 @@ static void config_handle_succeeded(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
-	fprintf(stderr, "running commands for configuration '%s'\n", pending->profile->name);
+	fprintf(stderr, "[kanshi] Running commands for configuration '%s'\n", pending->profile->name);
 	execute_profile_commands(pending->profile);
-	fprintf(stderr, "configuration for profile '%s' applied\n",
+	fprintf(stderr, "[kanshi] Configuration for profile '%s' applied\n",
 			pending->profile->name);
 	pending->state->current_profile = pending->profile;
 	free(pending);
@@ -132,7 +132,7 @@ static void config_handle_failed(void *data,
 		struct zwlr_output_configuration_v1 *config) {
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
-	fprintf(stderr, "failed to apply configuration for profile '%s'\n",
+	fprintf(stderr, "[kanshi] Failed to apply configuration for profile '%s'\n",
 			pending->profile->name);
 	free(pending);
 }
@@ -142,7 +142,7 @@ static void config_handle_cancelled(void *data,
 	struct kanshi_pending_profile *pending = data;
 	zwlr_output_configuration_v1_destroy(config);
 	// Wait for new serial
-	fprintf(stderr, "configuration for profile '%s' cancelled, retrying\n",
+	fprintf(stderr, "[kanshi] Configuration for profile '%s' cancelled, retrying\n",
 			pending->profile->name);
 	free(pending);
 }
@@ -204,7 +204,7 @@ static void apply_profile(struct kanshi_state *state,
 		i++;
 		struct kanshi_profile_output *profile_output = matches[i];
 
-		fprintf(stderr, "applying profile output '%s' on connected head '%s'\n",
+		fprintf(stderr, "[kanshi] Applying profile output '%s' on connected head '%s'\n",
 			profile_output->name, head->name);
 
 		bool enabled = head->enabled;
@@ -226,7 +226,7 @@ static void apply_profile(struct kanshi_state *state,
 				profile_output->mode.refresh);
 			if (mode == NULL) {
 				fprintf(stderr,
-					"output '%s' doesn't support mode '%dx%d@%fHz'\n",
+					"[kanshi] Output '%s' doesn't support mode '%dx%d@%fHz'\n",
 					head->name,
 					profile_output->mode.width, profile_output->mode.height,
 					(float)profile_output->mode.refresh / 1000);
@@ -343,7 +343,7 @@ static void head_handle_current_mode(void *data,
 			return;
 		}
 	}
-	fprintf(stderr, "received unknown current_mode\n");
+	fprintf(stderr, "[kanshi] Received unknown current_mode\n");
 	head->mode = NULL;
 }
 
@@ -414,10 +414,10 @@ static void output_manager_handle_done(void *data,
 	struct kanshi_profile_output *matches[HEADS_MAX];
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
-		fprintf(stderr, "applying profile '%s'\n", profile->name);
+		fprintf(stderr, "[kanshi] Applying profile '%s'\n", profile->name);
 		apply_profile(state, profile, matches);
 	} else {
-		fprintf(stderr, "no profile matched\n");
+		fprintf(stderr, "[kanshi] No profile matched\n");
 	}
 }
 
@@ -470,7 +470,7 @@ static struct kanshi_config *read_config(const char *config) {
 		snprintf(config_path, sizeof(config_path), "%s/.config/%s",
 			home, config_filename);
 	} else {
-		fprintf(stderr, "HOME not set\n");
+		fprintf(stderr, "[kanshi] HOME not set\n");
 		return NULL;
 	}
 
@@ -515,7 +515,7 @@ int main(int argc, char *argv[]) {
 
 	struct wl_display *display = wl_display_connect(NULL);
 	if (display == NULL) {
-		fprintf(stderr, "failed to connect to display\n");
+		fprintf(stderr, "[kanshi] Failed to connect to display\n");
 		return EXIT_FAILURE;
 	}
 
@@ -531,7 +531,7 @@ int main(int argc, char *argv[]) {
 	wl_display_roundtrip(display);
 
 	if (state.output_manager == NULL) {
-		fprintf(stderr, "compositor doesn't support "
+		fprintf(stderr, "[kanshi] Compositor doesn't support "
 			"wlr-output-management-unstable-v1\n");
 		return EXIT_FAILURE;
 	}

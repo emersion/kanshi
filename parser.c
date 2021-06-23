@@ -36,7 +36,7 @@ static int parser_read_char(struct kanshi_parser *parser) {
 	int ch = fgetc(parser->f);
 	if (ch == EOF) {
 		if (errno != 0) {
-			fprintf(stderr, "fgetc failed: %s\n", strerror(errno));
+			fprintf(stderr, "[kanshi] fgetc failed: %s\n", strerror(errno));
 		} else {
 			return '\0';
 		}
@@ -62,7 +62,7 @@ static int parser_peek_char(struct kanshi_parser *parser) {
 static bool parser_append_tok_ch(struct kanshi_parser *parser, char ch) {
 	// Always keep enough room for a terminating NULL char
 	if (parser->tok_str_len + 1 >= sizeof(parser->tok_str)) {
-		fprintf(stderr, "string too long\n");
+		fprintf(stderr, "[kanshi] String too long\n");
 		return false;
 	}
 	parser->tok_str[parser->tok_str_len] = ch;
@@ -76,7 +76,7 @@ static bool parser_read_quoted(struct kanshi_parser *parser) {
 		if (ch < 0) {
 			return false;
 		} else if (ch == '\0') {
-			fprintf(stderr, "unterminated quoted string\n");
+			fprintf(stderr, "[kanshi] Unterminated quoted string\n");
 			return false;
 		}
 
@@ -181,7 +181,7 @@ static bool parser_expect_token(struct kanshi_parser *parser,
 		return false;
 	}
 	if (parser->tok_type != want) {
-		fprintf(stderr, "expected %s, got %s\n",
+		fprintf(stderr, "[kanshi] Expected %s, got %s\n",
 			token_type_str(want), token_type_str(parser->tok_type));
 		return false;
 	}
@@ -205,16 +205,16 @@ static bool parse_mode(struct kanshi_profile_output *output, char *str) {
 	const char *refresh = strtok(NULL, "");
 
 	if (width == NULL || height == NULL) {
-		fprintf(stderr, "invalid output mode: missing width/height\n");
+		fprintf(stderr, "[kanshi] Invalid output mode: missing width/height\n");
 		return false;
 	}
 
 	if (!parse_int(&output->mode.width, width)) {
-		fprintf(stderr, "invalid output mode: invalid width\n");
+		fprintf(stderr, "[kanshi] Invalid output mode: invalid width\n");
 		return false;
 	}
 	if (!parse_int(&output->mode.height, height)) {
-		fprintf(stderr, "invalid output mode: invalid height\n");
+		fprintf(stderr, "[kanshi] Invalid output mode: invalid height\n");
 		return false;
 	}
 
@@ -224,7 +224,7 @@ static bool parse_mode(struct kanshi_profile_output *output, char *str) {
 		float v = strtof(refresh, &end);
 		if (errno != 0 || (end[0] != '\0' && strcmp(end, "Hz") != 0) ||
 				str[0] == '\0') {
-			fprintf(stderr, "invalid output mode: invalid refresh rate\n");
+			fprintf(stderr, "[kanshi] Invalid output mode: invalid refresh rate\n");
 			return false;
 		}
 		output->mode.refresh = v * 1000;
@@ -238,16 +238,16 @@ static bool parse_position(struct kanshi_profile_output *output, char *str) {
 	const char *y = strtok(NULL, "");
 
 	if (x == NULL || y == NULL) {
-		fprintf(stderr, "invalid output position: missing x/y\n");
+		fprintf(stderr, "[kanshi] Invalid output position: missing x/y\n");
 		return false;
 	}
 
 	if (!parse_int(&output->position.x, x)) {
-		fprintf(stderr, "invalid output position: invalid x\n");
+		fprintf(stderr, "[kanshi] Invalid output position: invalid x\n");
 		return false;
 	}
 	if (!parse_int(&output->position.y, y)) {
-		fprintf(stderr, "invalid output position: invalid y\n");
+		fprintf(stderr, "[kanshi] Invalid output position: invalid y\n");
 		return false;
 	}
 
@@ -321,13 +321,13 @@ static struct kanshi_profile_output *parse_profile_output(
 					break;
 				case KANSHI_OUTPUT_SCALE:
 					if (!parse_float(&output->scale, value)) {
-						fprintf(stderr, "invalid output scale\n");
+						fprintf(stderr, "[kanshi] Invalid output scale\n");
 						return NULL;
 					}
 					break;
 				case KANSHI_OUTPUT_TRANSFORM:
 					if (!parse_transform(&output->transform, value)) {
-						fprintf(stderr, "invalid output transform\n");
+						fprintf(stderr, "[kanshi] Invalid output transform\n");
 						return NULL;
 					}
 					break;
@@ -357,7 +357,7 @@ static struct kanshi_profile_output *parse_profile_output(
 					key = KANSHI_OUTPUT_TRANSFORM;
 				} else {
 					fprintf(stderr,
-						"unknown directive '%s' in profile output '%s'\n",
+						"[kanshi] Unknown directive '%s' in profile output '%s'\n",
 						key_str, output->name);
 					return NULL;
 				}
@@ -385,7 +385,7 @@ static struct kanshi_profile_command *parse_profile_command(
 	}
 
 	if (parser->tok_str_len <= 0) {
-		fprintf(stderr, "Ignoring empty command in config file on line %d\n",
+		fprintf(stderr, "[kanshi] Ignoring empty command in config file on line %d\n",
 			parser->line);
 		return NULL;
 	}
@@ -415,7 +415,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 		}
 		break;
 	default:
-		fprintf(stderr, "unexpected %s, expected '{' or a profile name\n",
+		fprintf(stderr, "[kanshi] Unexpected %s, expected '{' or a profile name\n",
 			token_type_str(parser->tok_type));
 	}
 
@@ -463,7 +463,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 				// Insert commands at the end to preserve order
 				wl_list_insert(profile->commands.prev, &command->link);
 			} else {
-				fprintf(stderr, "unknown directive '%s' in profile '%s'\n",
+				fprintf(stderr, "[kanshi] Unknown directive '%s' in profile '%s'\n",
 					directive, profile->name);
 				return NULL;
 			}
@@ -471,7 +471,7 @@ static struct kanshi_profile *parse_profile(struct kanshi_parser *parser) {
 		case KANSHI_TOKEN_NEWLINE:
 			break; // No-op
 		default:
-			fprintf(stderr, "unexpected %s in profile '%s'\n",
+			fprintf(stderr, "[kanshi] Unexpected %s in profile '%s'\n",
 				token_type_str(parser->tok_type), profile->name);
 			return NULL;
 		}
@@ -496,14 +496,14 @@ static bool parse_include_command(struct kanshi_parser *parser, struct kanshi_co
 
 	wordexp_t p;
 	if (wordexp(parser->tok_str, &p, WRDE_SHOWERR | WRDE_UNDEF) != 0) {
-		fprintf(stderr, "Could not expand include path: '%s'\n", parser->tok_str);
+		fprintf(stderr, "[kanshi] Could not expand include path: '%s'\n", parser->tok_str);
 		return false;
 	}
 
 	char **w = p.we_wordv;
 	for (size_t idx = 0; idx < p.we_wordc; idx++) {
 		if (!parse_config_file(w[idx], config)) {
-			fprintf(stderr, "Could not parse included config: '%s'\n", w[idx]);
+			fprintf(stderr, "[kanshi] Could not parse included config: '%s'\n", w[idx]);
 			wordfree(&p);
 			return false;
 		}
@@ -551,7 +551,7 @@ static bool _parse_config(struct kanshi_parser *parser, struct kanshi_config *co
 					return false;
 				}
 			} else {
-				fprintf(stderr, "unknown directive '%s'\n", directive);
+				fprintf(stderr, "[kanshi] Unknown directive '%s'\n", directive);
 				return false;
 			}
 		}
@@ -561,7 +561,7 @@ static bool _parse_config(struct kanshi_parser *parser, struct kanshi_config *co
 static bool parse_config_file(const char *path, struct kanshi_config *config) {
 	FILE *f = fopen(path, "r");
 	if (f == NULL) {
-		fprintf(stderr, "failed to open file %s: %s\n",
+		fprintf(stderr, "[kanshi] Failed to open file %s: %s\n",
 			path,
 			strerror(errno));
 		return false;
@@ -576,7 +576,7 @@ static bool parse_config_file(const char *path, struct kanshi_config *config) {
 	bool res = _parse_config(&parser, config);
 	fclose(f);
 	if (!res) {
-		fprintf(stderr, "failed to parse config file: "
+		fprintf(stderr, "[kanshi] Failed to parse config file: "
 			"error on line %d, column %d\n", parser.line, parser.col);
 		return false;
 	}
