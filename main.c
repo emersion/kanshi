@@ -488,14 +488,13 @@ static const struct option long_options[] = {
 };
 
 int main(int argc, char *argv[]) {
-	char *config_arg = NULL;
+	const char *config_arg = NULL;
 
 	int opt;
 	while ((opt = getopt_long(argc, argv, "hc:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'c':
-			free(config_arg);
-			config_arg = strdup(optarg);
+			config_arg = optarg;
 			break;
 		case 'h':
 			fprintf(stderr, usage, argv[0]);
@@ -510,8 +509,6 @@ int main(int argc, char *argv[]) {
 	if (config == NULL) {
 		return EXIT_FAILURE;
 	}
-
-	free(config_arg);
 
 	struct wl_display *display = wl_display_connect(NULL);
 	if (display == NULL) {
