@@ -78,34 +78,36 @@ static struct kanshi_profile *match(struct kanshi_state *state,
 
 
 static void exec_command(char *cmd) {
-	pid_t pid, child;
+	pid_t child, grandchild;
 	// Fork process
-	if ((pid = fork()) == 0) {
-		// Fork child process again
+	if ((child = fork()) == 0) {
+		// Fork child process again so we can unparent the process
 		setsid();
 		sigset_t set;
 		sigemptyset(&set);
 		sigprocmask(SIG_SETMASK, &set, NULL);
-		if ((child = fork()) == 0) {
+		if ((grandchild = fork()) == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
-			fprintf(stderr, "Executing command '%s' failed: %s", cmd, strerror(errno));
-			exit(-1);
+			fprintf(stderr, "Executing command '%s' failed: %s\n", cmd, strerror(errno));
+			_exit(-1);
 		}
-		if (child < 0) {
+		if (grandchild < 0) {
 			fprintf(stderr, "Impossible to fork a new process to execute"
-					" command '%s': %s", cmd, strerror(errno));
-			exit(0);
+					" command '%s': %s\n", cmd, strerror(errno));
+			_exit(1);
 		}
-		exit(0); // Close child process
+		_exit(0); // Close child process
 	}
 
-	if (pid < 0) {
+	if (child < 0) {
 		perror("Impossible to fork a new process");
 		return;
 	}
 
 	// cleanup child process
-	waitpid(pid, NULL, 0);
+	if (waitpid(child, NULL, 0) < 0) {
+		perror("Impossible to clean up child process");
+	}
 }
 
 static void execute_profile_commands(struct kanshi_profile *profile) {
