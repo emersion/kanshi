@@ -1,4 +1,4 @@
-# kanshi
+# [kanshi]
 
 kanshi allows you to define output profiles that are automatically enabled and
 disabled on hotplug. For instance, this can be used to turn a laptop's internal
@@ -45,8 +45,19 @@ profile {
 }
 ```
 
+## Contributing
+
+The upstream repository can be found [on SourceHut][repo]. Open tickets [on
+the SourceHut tracker][issue-tracker]. Send patches [on the mailing list]
+[mailing-list] or open pull requests [on the GitHub mirror][github].
+
 ## License
 
 MIT
 
+[kanshi]: https://wayland.emersion.fr/kanshi/
 [autorandr]: https://github.com/phillipberndt/autorandr
+[repo]: https://git.sr.ht/~emersion/kanshi
+[issue-tracker]: https://todo.sr.ht/~emersion/kanshi
+[mailing-list]: https://lists.sr.ht/~emersion/public-inbox
+[github]: https://github.com/emersion/kanshi
