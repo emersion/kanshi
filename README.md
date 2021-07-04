@@ -48,8 +48,9 @@ profile {
 ## Contributing
 
 The upstream repository can be found [on SourceHut][repo]. Open tickets [on
-the SourceHut tracker][issue-tracker]. Send patches [on the mailing list]
-[mailing-list] or open pull requests [on the GitHub mirror][github].
+the SourceHut tracker][issue-tracker]. Send patches
+[on the mailing list][mailing-list] or open pull requests
+[on the GitHub mirror][github].
 
 ## License
 
