@@ -43,6 +43,7 @@ executable(
 	files(
 		'main.c',
 		'parser.c',
+		'event-loop.c',
 	),
 	include_directories: include_directories('include'),
 	dependencies: [wayland_client, client_protos],
