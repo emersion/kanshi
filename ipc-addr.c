@@ -18,3 +18,8 @@ bool check_env(void) {
 
 	return true;
 }
+
+int get_ipc_address(char *address, size_t size) {
+	return snprintf(address, size, "unix:%s/fr.emersion.kanshi.%s",
+			getenv("XDG_RUNTIME_DIR"), getenv("WAYLAND_DISPLAY"));
+}

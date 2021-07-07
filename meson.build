@@ -35,6 +35,7 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+varlink = dependency('libvarlink', required: get_option('varlink'))
 
 subdir('protocol')
 
@@ -43,6 +44,8 @@ kanshi_deps = [
 	client_protos,
 ]
 
+kanshi_args = ['-DKANSHI_VERSION="@0@"'.format(meson.project_version())]
+
 kanshi_srcs = [
 	'event-loop.c',
 	'main.c',
@@ -50,11 +53,18 @@ kanshi_srcs = [
 	'ipc-addr.c',
 ]
 
+if varlink.found()
+	kanshi_deps += varlink
+	kanshi_args += '-DKANSHI_HAS_VARLINK'
+	kanshi_srcs += ['ipc.c']
+endif
+
 executable(
 	meson.project_name(),
 	kanshi_srcs,
 	include_directories: include_directories('include'),
 	dependencies: kanshi_deps,
+	c_args: kanshi_args,
 	install: true,
 )
 
