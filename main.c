@@ -87,6 +87,16 @@ static void exec_command(char *cmd) {
 		sigset_t set;
 		sigemptyset(&set);
 		sigprocmask(SIG_SETMASK, &set, NULL);
+
+		struct sigaction action;
+		sigfillset(&action.sa_mask);
+		action.sa_flags = 0;
+		action.sa_handler = SIG_DFL;
+		sigaction(SIGINT, &action, NULL);
+		sigaction(SIGQUIT, &action, NULL);
+		sigaction(SIGTERM, &action, NULL);
+		sigaction(SIGHUP, &action, NULL);
+
 		if ((grandchild = fork()) == 0) {
 			execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
 			fprintf(stderr, "Executing command '%s' failed: %s\n", cmd, strerror(errno));
@@ -487,6 +497,40 @@ static struct kanshi_config *read_config(const char *config) {
 	return parse_config(config_path);
 }
 
+static void destroy_config(struct kanshi_config *config) {
+	struct kanshi_profile *profile, *tmp_profile;
+	wl_list_for_each_safe(profile, tmp_profile, &config->profiles, link) {
+		struct kanshi_profile_output *output, *tmp_output;
+		wl_list_for_each_safe(output, tmp_output, &profile->outputs, link) {
+			free(output->name);
+			wl_list_remove(&output->link);
+			free(output);
+		}
+		struct kanshi_profile_command *command, *tmp_command;
+		wl_list_for_each_safe(command, tmp_command, &profile->commands, link) {
+			free(command->command);
+			wl_list_remove(&command->link);
+			free(command);
+		}
+		wl_list_remove(&profile->link);
+		free(profile);
+	}
+	free(config);
+}
+
+bool kanshi_reload_config(struct kanshi_state *state) {
+	fprintf(stderr, "reloading config\n");
+	struct kanshi_config *config = read_config(state->config_arg);
+	if (config != NULL) {
+		destroy_config(state->config);
+		state->config = config;
+		state->pending_profile = NULL;
+		state->current_profile = NULL;
+		return try_apply_profiles(state);
+	}
+	return false;
+}
+
 static const char usage[] = "Usage: %s [options...]\n"
 "  -h, --help           Show help message and quit\n"
 "  -c, --config <path>  Path to config file.\n";
@@ -530,6 +574,7 @@ int main(int argc, char *argv[]) {
 		.running = true,
 		.display = display,
 		.config = config,
+		.config_arg = config_arg,
 	};
 	int ret = EXIT_SUCCESS;
 	wl_list_init(&state.heads);

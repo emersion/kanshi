@@ -24,6 +24,8 @@ kanshi is configured with a list of output profiles. Each profile contains a set
 of outputs. A profile will be automatically activated if all specified outputs
 are currently connected. A profile contains configuration for each output.
 
+If kanshi receives a SIGHUP signal, it will reread its config file.
+
 # CONFIGURATION
 
 kanshi reads its configuration from *$XDG_CONFIG_HOME/kanshi/config*. If unset,
