@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
 #include <signal.h>
@@ -187,13 +188,16 @@ static struct kanshi_mode *match_mode(struct kanshi_head *head,
 static void apply_profile(struct kanshi_state *state,
 		struct kanshi_profile *profile,
 		struct kanshi_profile_output **matches) {
-	if (state->current_profile == profile) {
+	if (state->pending_profile == profile || state->current_profile == profile) {
 		return;
 	}
+
+	fprintf(stderr, "applying profile '%s'\n", profile->name);
 
 	struct kanshi_pending_profile *pending = calloc(1, sizeof(*pending));
 	pending->state = state;
 	pending->profile = profile;
+	state->pending_profile = profile;
 
 	struct zwlr_output_configuration_v1 *config =
 		zwlr_output_manager_v1_create_configuration(state->output_manager,
@@ -406,21 +410,25 @@ static void output_manager_handle_head(void *data,
 	zwlr_output_head_v1_add_listener(wlr_head, &head_listener, head);
 }
 
-static void output_manager_handle_done(void *data,
-		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
-	struct kanshi_state *state = data;
-	state->serial = serial;
-
+static bool try_apply_profiles(struct kanshi_state *state) {
 	assert(wl_list_length(&state->heads) <= HEADS_MAX);
 	// matches[i] gives the kanshi_profile_output for the i-th head
 	struct kanshi_profile_output *matches[HEADS_MAX];
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
-		fprintf(stderr, "applying profile '%s'\n", profile->name);
 		apply_profile(state, profile, matches);
-	} else {
-		fprintf(stderr, "no profile matched\n");
+		return true;
 	}
+	fprintf(stderr, "no profile matched\n");
+	return false;
+}
+
+static void output_manager_handle_done(void *data,
+		struct zwlr_output_manager_v1 *manager, uint32_t serial) {
+	struct kanshi_state *state = data;
+	state->serial = serial;
+
+	try_apply_profiles(state);
 }
 
 static void output_manager_handle_finished(void *data,
@@ -520,8 +528,10 @@ int main(int argc, char *argv[]) {
 
 	struct kanshi_state state = {
 		.running = true,
+		.display = display,
 		.config = config,
 	};
+	int ret = EXIT_SUCCESS;
 	wl_list_init(&state.heads);
 
 	struct wl_registry *registry = wl_display_get_registry(display);
@@ -532,12 +542,14 @@ int main(int argc, char *argv[]) {
 	if (state.output_manager == NULL) {
 		fprintf(stderr, "compositor doesn't support "
 			"wlr-output-management-unstable-v1\n");
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto done;
 	}
 
-	while (state.running && wl_display_dispatch(display) != -1) {
-		// This space intentionally left blank
-	}
+	ret = kanshi_main_loop(&state);
 
-	return EXIT_SUCCESS;
+done:
+	wl_display_disconnect(display);
+
+	return ret;
 }

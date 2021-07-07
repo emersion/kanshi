@@ -41,6 +41,7 @@ struct kanshi_head {
 
 struct kanshi_state {
 	bool running;
+	struct wl_display *display;
 	struct zwlr_output_manager_v1 *output_manager;
 
 	struct kanshi_config *config;
@@ -48,11 +49,14 @@ struct kanshi_state {
 	struct wl_list heads;
 	uint32_t serial;
 	struct kanshi_profile *current_profile;
+	struct kanshi_profile *pending_profile;
 };
 
 struct kanshi_pending_profile {
 	struct kanshi_state *state;
 	struct kanshi_profile *profile;
 };
+
+int kanshi_main_loop(struct kanshi_state *state);
 
 #endif
