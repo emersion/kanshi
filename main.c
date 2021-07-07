@@ -15,6 +15,7 @@
 #include "config.h"
 #include "kanshi.h"
 #include "parser.h"
+#include "ipc.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
 #define HEADS_MAX 64
@@ -577,6 +578,12 @@ int main(int argc, char *argv[]) {
 		.config_arg = config_arg,
 	};
 	int ret = EXIT_SUCCESS;
+#if KANSHI_HAS_VARLINK
+	if (kanshi_init_ipc(&state) != 0) {
+		ret = EXIT_FAILURE;
+		goto done;
+	}
+#endif
 	wl_list_init(&state.heads);
 
 	struct wl_registry *registry = wl_display_get_registry(display);
@@ -594,6 +601,9 @@ int main(int argc, char *argv[]) {
 	ret = kanshi_main_loop(&state);
 
 done:
+#if KANSHI_HAS_VARLINK
+	kanshi_free_ipc(&state);
+#endif
 	wl_display_disconnect(display);
 
 	return ret;

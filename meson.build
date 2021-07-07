@@ -35,18 +35,37 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+varlink = dependency('libvarlink', required: get_option('ipc'))
+
+add_project_arguments([
+	'-DKANSHI_VERSION="@0@"'.format(meson.project_version()),
+	'-DKANSHI_HAS_VARLINK=@0@'.format(varlink.found().to_int()),
+], language: 'c')
 
 subdir('protocol')
 
+kanshi_deps = [
+	wayland_client,
+	client_protos,
+]
+
+kanshi_srcs = [
+	'event-loop.c',
+	'main.c',
+	'parser.c',
+	'ipc-addr.c',
+]
+
+if varlink.found()
+	kanshi_deps += varlink
+	kanshi_srcs += ['ipc.c', 'ipc-addr.c']
+endif
+
 executable(
 	meson.project_name(),
-	files(
-		'main.c',
-		'parser.c',
-		'event-loop.c',
-	),
+	kanshi_srcs,
 	include_directories: include_directories('include'),
-	dependencies: [wayland_client, client_protos],
+	dependencies: kanshi_deps,
 	install: true,
 )
 

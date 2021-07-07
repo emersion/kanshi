@@ -10,6 +10,10 @@
 
 #include "kanshi.h"
 
+#if KANSHI_HAS_VARLINK
+#include <varlink.h>
+#endif
+
 static int set_pipe_flags(int fd) {
 	int flags = fcntl(fd, F_GETFL);
 	if (flags == -1) {
@@ -45,6 +49,9 @@ static void signal_handler(int signum) {
 enum readfds_type {
 	FD_WAYLAND,
 	FD_SIGNAL,
+#if KANSHI_HAS_VARLINK
+	FD_VARLINK,
+#endif
 	FD_COUNT,
 };
 
@@ -74,6 +81,10 @@ int kanshi_main_loop(struct kanshi_state *state) {
 	readfds[FD_WAYLAND].events = POLLIN;
 	readfds[FD_SIGNAL].fd = signal_pipefds[0];
 	readfds[FD_SIGNAL].events = POLLIN;
+#if KANSHI_HAS_VARLINK
+	readfds[FD_VARLINK].fd = varlink_service_get_fd(state->service);
+	readfds[FD_VARLINK].events = POLLIN;
+#endif
 
 	while (state->running) {
 		while (wl_display_prepare_read(state->display) != 0) {
@@ -106,6 +117,17 @@ int kanshi_main_loop(struct kanshi_state *state) {
 		if (wl_display_read_events(state->display) == -1) {
 			return EXIT_FAILURE;
 		}
+
+#if KANSHI_HAS_VARLINK
+		if (readfds[FD_VARLINK].revents & POLLIN) {
+			long result = varlink_service_process_events(state->service);
+			if (result != 0) {
+				fprintf(stderr, "varlink_service_process_events failed: %s\n",
+						varlink_error_string(-result));
+				return EXIT_FAILURE;
+			}
+		}
+#endif
 
 		if (readfds[FD_SIGNAL].revents & POLLIN) {
 			for (;;) {
