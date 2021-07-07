@@ -15,6 +15,7 @@ Dependencies:
 
 * wayland-client
 * scdoc (optional, for man pages)
+* libvarlink (optional, for remote control functionality)
 
 ```sh
 meson build
