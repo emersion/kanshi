@@ -10,15 +10,77 @@
 
 #include "kanshi.h"
 
+static int set_pipe_flags(int fd) {
+	int flags = fcntl(fd, F_GETFL);
+	if (flags == -1) {
+		fprintf(stderr, "fnctl F_GETFL failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags |= O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) == -1) {
+		fprintf(stderr, "fnctl F_SETFL failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags = fcntl(fd, F_GETFD);
+	if (flags == -1) {
+		fprintf(stderr, "fnctl F_GETFD failed: %s\n", strerror(errno));
+		return -1;
+	}
+	flags |= O_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1) {
+		fprintf(stderr, "fnctl F_SETFD failed: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+static int signal_pipefds[2];
+
+static void signal_handler(int signum) {
+	if (write(signal_pipefds[1], &signum, sizeof(signum)) == -1) {
+		// we can't use stdio inside a signal handler
+		const char error_message[] = "handling signal failed: ";
+		const char *error_string = strerror(errno);
+		write(STDERR_FILENO, error_message, (sizeof error_message) - 1);
+		write(STDERR_FILENO, error_string, strlen(error_string));
+		write(STDERR_FILENO, "\n", 1);
+
+		_exit(signum | 0x80);
+	}
+}
+
 enum readfds_type {
 	FD_WAYLAND,
+	FD_SIGNAL,
 	FD_COUNT,
 };
 
 int kanshi_main_loop(struct kanshi_state *state) {
+	if (pipe(signal_pipefds) == -1) {
+		fprintf(stderr, "read from signalfd failed: %s\n", strerror(errno));
+		return EXIT_FAILURE;
+	}
+	if (set_pipe_flags(signal_pipefds[0]) == -1) {
+		return EXIT_FAILURE;
+	}
+	if (set_pipe_flags(signal_pipefds[1]) == -1) {
+		return EXIT_FAILURE;
+	}
+
+	struct sigaction action;
+	sigfillset(&action.sa_mask);
+	action.sa_flags = 0;
+	action.sa_handler = signal_handler;
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGQUIT, &action, NULL);
+	sigaction(SIGTERM, &action, NULL);
+	sigaction(SIGHUP, &action, NULL);
+
 	struct pollfd readfds[FD_COUNT] = {0};
 	readfds[FD_WAYLAND].fd = wl_display_get_fd(state->display);
 	readfds[FD_WAYLAND].events = POLLIN;
+	readfds[FD_SIGNAL].fd = signal_pipefds[0];
+	readfds[FD_SIGNAL].events = POLLIN;
 
 	while (state->running) {
 		while (wl_display_prepare_read(state->display) != 0) {
@@ -50,6 +112,36 @@ int kanshi_main_loop(struct kanshi_state *state) {
 
 		if (wl_display_read_events(state->display) == -1) {
 			return EXIT_FAILURE;
+		}
+
+		if (readfds[FD_SIGNAL].revents & POLLIN) {
+			for (;;) {
+				int signum;
+				ssize_t s
+					= read(readfds[FD_SIGNAL].fd, &signum, sizeof(signum));
+				if (s == 0) {
+					break;
+				}
+				if (s < 0) {
+					if (errno == EAGAIN) {
+						break;
+					}
+					fprintf(stderr, "read from signal pipe failed: %s\n",
+							strerror(errno));
+					return EXIT_FAILURE;
+				}
+				if (s < (ssize_t) sizeof(signum)) {
+					fprintf(stderr, "read too few bytes from signal pipe\n");
+					return EXIT_FAILURE;
+				}
+				switch (signum) {
+				case SIGHUP:
+					kanshi_reload_config(state);
+					break;
+				default:
+					return signum | 0x80;
+				}
+			}
 		}
 
 		if (wl_display_dispatch_pending(state->display) == -1) {

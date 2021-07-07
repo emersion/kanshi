@@ -45,6 +45,7 @@ struct kanshi_state {
 	struct zwlr_output_manager_v1 *output_manager;
 
 	struct kanshi_config *config;
+	const char *config_arg;
 
 	struct wl_list heads;
 	uint32_t serial;
@@ -56,6 +57,8 @@ struct kanshi_pending_profile {
 	struct kanshi_state *state;
 	struct kanshi_profile *profile;
 };
+
+bool kanshi_reload_config(struct kanshi_state *state);
 
 int kanshi_main_loop(struct kanshi_state *state);
 
