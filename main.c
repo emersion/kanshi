@@ -15,6 +15,7 @@
 #include "config.h"
 #include "kanshi.h"
 #include "parser.h"
+#include "ipc.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 
 #define HEADS_MAX 64
@@ -557,6 +558,10 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, usage, argv[0]);
 			return EXIT_FAILURE;
 		}
+	}
+
+	if (!check_env()) {
+		return EXIT_FAILURE;
 	}
 
 	struct kanshi_config *config = read_config(config_arg);

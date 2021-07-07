@@ -38,15 +38,23 @@ wayland_client = dependency('wayland-client')
 
 subdir('protocol')
 
+kanshi_deps = [
+	wayland_client,
+	client_protos,
+]
+
+kanshi_srcs = [
+	'event-loop.c',
+	'main.c',
+	'parser.c',
+	'ipc-addr.c',
+]
+
 executable(
 	meson.project_name(),
-	files(
-		'main.c',
-		'parser.c',
-		'event-loop.c',
-	),
+	kanshi_srcs,
 	include_directories: include_directories('include'),
-	dependencies: [wayland_client, client_protos],
+	dependencies: kanshi_deps,
 	install: true,
 )
 
