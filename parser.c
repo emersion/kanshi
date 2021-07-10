@@ -347,7 +347,9 @@ static struct kanshi_profile_output *parse_profile_output(
 					output->enabled = false;
 					output->fields |= KANSHI_OUTPUT_ENABLED;
 					has_key = false;
-				} else if (strcmp(key_str, "mode") == 0) {
+				} else if (strcmp(key_str, "mode") == 0 ||
+					   strcmp(key_str, "resolution") == 0 ||
+					   strcmp(key_str, "res") == 0) {
 					key = KANSHI_OUTPUT_MODE;
 				} else if (strcmp(key_str, "position") == 0) {
 					key = KANSHI_OUTPUT_POSITION;
