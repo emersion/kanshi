@@ -310,6 +310,10 @@ static struct kanshi_profile_output *parse_profile_output(
 				char *value = parser->tok_str;
 				switch (key) {
 				case KANSHI_OUTPUT_MODE:
+					if (strcmp(value, "--custom") == 0) {
+						output->mode.custom = true;
+						continue;
+					}
 					if (!parse_mode(output, value)) {
 						return NULL;
 					}
