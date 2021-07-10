@@ -35,19 +35,52 @@ add_project_arguments(cc.get_supported_arguments([
 ]), language: 'c')
 
 wayland_client = dependency('wayland-client')
+varlink = dependency('libvarlink', required: get_option('varlink'))
 
 subdir('protocol')
 
+kanshi_deps = [
+	wayland_client,
+	client_protos,
+]
+
+kanshi_args = ['-DKANSHI_VERSION="@0@"'.format(meson.project_version())]
+
+kanshi_srcs = [
+	'event-loop.c',
+	'main.c',
+	'parser.c',
+	'ipc-addr.c',
+]
+
+if varlink.found()
+	kanshi_deps += varlink
+	kanshi_args += '-DKANSHI_HAS_VARLINK'
+	kanshi_srcs += ['ipc.c']
+endif
+
 executable(
 	meson.project_name(),
-	files(
-		'main.c',
-		'parser.c',
-	),
+	kanshi_srcs,
 	include_directories: include_directories('include'),
-	dependencies: [wayland_client, client_protos],
+	dependencies: kanshi_deps,
+	c_args: kanshi_args,
 	install: true,
 )
+
+if varlink.found()
+	executable(
+			meson.project_name() + 'ctl',
+			files(
+				'ctl.c',
+				'ipc-addr.c',
+			),
+			include_directories: include_directories('include'),
+			dependencies: [varlink],
+			c_args: kanshi_args,
+			install: true,
+		)
+endif
 
 scdoc = dependency(
 	'scdoc',
@@ -62,6 +95,7 @@ if scdoc.found()
 	man_files = [
 		'kanshi.1.scd',
 		'kanshi.5.scd',
+		'kanshictl.1.scd',
 	]
 	foreach filename : man_files
 		topic = filename.split('.')[-3].split('/')[-1]
