@@ -13,3 +13,7 @@ tasks:
   - build: |
       cd kanshi
       ninja -C build
+  - build-features-disabled: |
+      cd kanshi
+      meson build --reconfigure -Dauto_features=disabled
+      ninja -C build
