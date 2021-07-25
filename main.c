@@ -83,7 +83,6 @@ static struct kanshi_profile *match(struct kanshi_state *state,
 	return NULL;
 }
 
-
 static void exec_command(char *cmd) {
 	pid_t child, grandchild;
 	// Fork process
@@ -430,6 +429,10 @@ static bool try_apply_profiles(struct kanshi_state *state) {
 	assert(wl_list_length(&state->heads) <= HEADS_MAX);
 	// matches[i] gives the kanshi_profile_output for the i-th head
 	struct kanshi_profile_output *matches[HEADS_MAX];
+	if (state->current_profile && match_profile(state, state->current_profile, matches)) {
+		//apply_profile?
+		return true;
+	}
 	struct kanshi_profile *profile = match(state, matches);
 	if (profile != NULL) {
 		apply_profile(state, profile, matches);
@@ -537,6 +540,16 @@ bool kanshi_reload_config(struct kanshi_state *state) {
 		return try_apply_profiles(state);
 	}
 	return false;
+}
+
+bool kanshi_set_profile(struct kanshi_state *state, const char *name) {
+	fprintf(stderr, "loading profile %s\n", name);
+	free(state->selected_profile_name);
+	state->selected_profile_name = strdup(name);
+	if (state->selected_profile_name == NULL) {
+		return false;
+	}
+	return try_apply_profiles(state);
 }
 
 static const char usage[] = "Usage: %s [options...]\n"

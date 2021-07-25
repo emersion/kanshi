@@ -63,6 +63,7 @@ struct kanshi_pending_profile {
 };
 
 bool kanshi_reload_config(struct kanshi_state *state);
+bool kanshi_set_profile(struct kanshi_state *state, const char *name);
 
 int kanshi_main_loop(struct kanshi_state *state);
 
