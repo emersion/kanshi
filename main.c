@@ -36,7 +36,7 @@ static bool match_profile(struct kanshi_state *state,
 		return false;
 	}
 
-	memset(matches, 0, HEADS_MAX * sizeof(struct kanshi_head *));
+	memset(matches, 0, HEADS_MAX * sizeof *matches);
 
 	// Wildcards are stored at the end of the list, so those will be matched
 	// last
