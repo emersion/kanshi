@@ -17,6 +17,8 @@ kanshictl - control the kanshi daemon remotely
 
 reload - reload the config file
 
+set-profile <profile name> - try to apply a named profile
+
 # AUTHORS
 
 Maintained by Simon Ser <contact@emersion.fr>, who is assisted by other
