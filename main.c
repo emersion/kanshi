@@ -38,6 +38,11 @@ static bool match_profile(struct kanshi_state *state,
 
 	memset(matches, 0, HEADS_MAX * sizeof *matches);
 
+	if (state->selected_profile_name != NULL && profile->name != NULL &&
+			  strcmp(state->selected_profile_name, profile->name) != 0) {
+		 return false;
+	}
+
 	// Wildcards are stored at the end of the list, so those will be matched
 	// last
 	struct kanshi_profile_output *profile_output;
@@ -527,6 +532,8 @@ bool kanshi_reload_config(struct kanshi_state *state) {
 		state->config = config;
 		state->pending_profile = NULL;
 		state->current_profile = NULL;
+		free(state->selected_profile_name);
+		state->selected_profile_name = NULL;
 		return try_apply_profiles(state);
 	}
 	return false;

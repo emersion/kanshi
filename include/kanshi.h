@@ -54,6 +54,7 @@ struct kanshi_state {
 	uint32_t serial;
 	struct kanshi_profile *current_profile;
 	struct kanshi_profile *pending_profile;
+	char *selected_profile_name;
 };
 
 struct kanshi_pending_profile {
