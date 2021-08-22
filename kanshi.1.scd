@@ -4,7 +4,7 @@ kanshi(1)
 
 kanshi - dynamic output configuration
 
-# DESCRIPTION
+# SYNOPSIS
 
 *kanshi* [options...]
 
@@ -16,7 +16,7 @@ kanshi - dynamic output configuration
 *-c, --config* <config>
 	Specifies a config file.
 
-# SYNOPSIS
+# DESCRIPTION
 
 kanshi is a Wayland daemon that automatically configures outputs.
 
