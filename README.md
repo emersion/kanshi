@@ -49,9 +49,8 @@ profile {
 ## Contributing
 
 The upstream repository can be found [on SourceHut][repo]. Open tickets [on
-the SourceHut tracker][issue-tracker]. Send patches
-[on the mailing list][mailing-list] or open pull requests
-[on the GitHub mirror][github].
+the SourceHut tracker][issue-tracker], send patches
+[on the mailing list][mailing-list].
 
 ## License
 
@@ -62,4 +61,3 @@ MIT
 [repo]: https://git.sr.ht/~emersion/kanshi
 [issue-tracker]: https://todo.sr.ht/~emersion/kanshi
 [mailing-list]: https://lists.sr.ht/~emersion/public-inbox
-[github]: https://github.com/emersion/kanshi
