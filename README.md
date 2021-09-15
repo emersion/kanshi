@@ -1,5 +1,7 @@
 # [kanshi]
 
+> **Heads up!** This project has [moved to SourceHut](https://sr.ht/~emersion/kanshi/).
+
 kanshi allows you to define output profiles that are automatically enabled and
 disabled on hotplug. For instance, this can be used to turn a laptop's internal
 screen off when docked.
