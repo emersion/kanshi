@@ -29,6 +29,19 @@ static long handle_reload(VarlinkService *service, VarlinkCall *call,
 	return 0;
 }
 
+static long select_profile(VarlinkService *service, VarlinkCall *call,
+		VarlinkObject *parameters, uint64_t flags, void *userdata) {
+	struct kanshi_state *state = userdata;
+	const char *profile;
+	if (varlink_object_get_string(parameters, "profile", &profile) < 0) {
+		return -1;
+	}
+	kanshi_set_profile(state, profile);
+	struct wl_callback *callback = wl_display_sync(state->display);
+	wl_callback_add_listener(callback, &reload_config_listener, call);
+	return 0;
+}
+
 int kanshi_init_ipc(struct kanshi_state *state) {
 	VarlinkService *service;
 	char address[PATH_MAX];
@@ -44,10 +57,12 @@ int kanshi_init_ipc(struct kanshi_state *state) {
 	}
 
 	const char *interface = "interface fr.emersion.kanshi\n"
-		"method Reload() -> ()";
+		"method Reload() -> ()\n"
+		"method SetProfile(profile: string) -> ()";
 
 	long result = varlink_service_add_interface(service, interface,
 			"Reload", handle_reload, state,
+			"SetProfile", select_profile, state,
 			NULL);
 	if (result != 0) {
 		fprintf(stderr, "varlink_service_add_interface failed: %s\n",

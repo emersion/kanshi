@@ -10,10 +10,13 @@
 
 #include "ipc.h"
 
+#define PREFIX "fr.emersion.kanshi."
+
 static void usage(const char *progname) {
 	fprintf(stderr, "Usage: %s [command]\n"
 			"Accepted commands:\n"
-			"  reload - reload the config file\n",
+			"  reload - reload the config file\n"
+			"  set-profile <profile name> - try to apply a named profile\n",
 			progname);
 }
 
@@ -74,9 +77,22 @@ int main(int argc, char *argv[]) {
 				"Is the kanshi daemon running?\n", address);
 		return EXIT_FAILURE;
 	}
+
+	const char *method_name = NULL;
+	VarlinkObject *parameter = NULL;
 	if (strcmp(argv[1], "reload") == 0) {
+		method_name = PREFIX "Reload";
+	} else if (strcmp(argv[1], "set-profile") == 0) {
+		if (argc != 3) {
+			return EXIT_FAILURE;
+		}
+		method_name = PREFIX "SetProfile";
+		varlink_object_new(&parameter);
+		varlink_object_set_string(parameter, "profile", argv[2]);
+	}
+	if (method_name) {
 		long result = varlink_connection_call(connection,
-				"fr.emersion.kanshi.Reload", NULL, 0, reload_callback, NULL);
+				method_name, parameter, 0, reload_callback, NULL);
 		if (result != 0) {
 			fprintf(stderr, "varlink_connection_call failed: %s\n",
 					varlink_error_string(-result));
@@ -84,6 +100,7 @@ int main(int argc, char *argv[]) {
 		}
 		return wait_for_event(connection);
 	}
+
 	fprintf(stderr, "invalid command: %s\n", argv[1]);
 	usage(argv[0]);
 	return EXIT_FAILURE;
