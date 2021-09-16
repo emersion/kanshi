@@ -21,6 +21,7 @@ struct kanshi_profile_output {
 	struct {
 		int width, height;
 		int refresh; // mHz
+		bool custom;
 	} mode;
 	struct {
 		int x, y;
